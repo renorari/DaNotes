@@ -11,9 +11,18 @@ struct ContentView: View {
     @AppStorage("text") private var text: String = ""
     
     var body: some View {
-        TextEditor(text: $text)
-            .padding()
-            .font(.system(size: 20))
+        HStack {
+            TextEditor(text: $text)
+                .font(.system(size: 20))
+                .padding()
+            
+            Divider()
+            
+            Text(.init(text))
+                .font(.system(size: 20))
+                .padding()
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
     }
 }
 
