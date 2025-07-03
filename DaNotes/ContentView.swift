@@ -19,12 +19,14 @@ struct ContentView: View {
             
             Divider()
             
-            Markdown(text)
-                .padding()
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .markdownTextStyle() {
-                  FontSize(20)
-                }
+            ScrollView {
+                Markdown(text)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .markdownTextStyle() {
+                        FontSize(20)
+                    }
+            }
+            .padding()
         }
     }
 }
