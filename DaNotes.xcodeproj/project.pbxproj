@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		B742040C2E163A5200D31BC6 /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = B742040B2E163A5200D31BC6 /* MarkdownUI */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		B75336482E161863005E9DE7 /* DaNotes.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DaNotes.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -23,6 +27,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B742040C2E163A5200D31BC6 /* MarkdownUI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -65,6 +70,7 @@
 			);
 			name = DaNotes;
 			packageProductDependencies = (
+				B742040B2E163A5200D31BC6 /* MarkdownUI */,
 			);
 			productName = DaNotes;
 			productReference = B75336482E161863005E9DE7 /* DaNotes.app */;
@@ -94,6 +100,9 @@
 			);
 			mainGroup = B753363F2E161863005E9DE7;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				B742040A2E163A5200D31BC6 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = B75336492E161863005E9DE7 /* Products */;
 			projectDirPath = "";
@@ -329,6 +338,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		B742040A2E163A5200D31BC6 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/gonzalezreal/swift-markdown-ui.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.4.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		B742040B2E163A5200D31BC6 /* MarkdownUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B742040A2E163A5200D31BC6 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */;
+			productName = MarkdownUI;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = B75336402E161863005E9DE7 /* Project object */;
 }

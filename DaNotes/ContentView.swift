@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import MarkdownUI
 
 struct ContentView: View {
     @AppStorage("text") private var text: String = ""
@@ -18,10 +19,12 @@ struct ContentView: View {
             
             Divider()
             
-            Text(.init(text))
-                .font(.system(size: 20))
+            Markdown(text)
                 .padding()
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .markdownTextStyle() {
+                  FontSize(20)
+                }
         }
     }
 }
