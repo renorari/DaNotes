@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct ContentView: View {
-    @State private var text: String = ""
+    @AppStorage("text") private var text: String = ""
     
     var body: some View {
         TextEditor(text: $text)
