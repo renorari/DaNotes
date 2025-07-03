@@ -16,6 +16,14 @@ struct ContentView: View {
             TextEditor(text: $text)
                 .font(.system(size: 20))
                 .padding()
+                .toolbar(content: {
+                    ToolbarItem() {
+                        Button("clear", systemImage: "trash") {
+                            text = ""
+                        }
+                        .keyboardShortcut(.delete, modifiers: .command)
+                    }
+                })
             
             Divider()
             
