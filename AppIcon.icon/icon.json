@@ -1,6 +1,6 @@
 {
   "fill" : {
-    "solid" : "extended-gray:1.00000,1.00000"
+    "automatic-gradient" : "srgb:0.09020,0.27843,0.89804,1.00000"
   },
   "groups" : [
     {
@@ -15,7 +15,7 @@
           "fill-specializations" : [
             {
               "value" : {
-                "solid" : "srgb:0.80000,0.84667,1.00000,1.00000"
+                "solid" : "srgb:0.09020,0.27843,0.89804,1.00000"
               }
             },
             {
@@ -39,7 +39,7 @@
           "fill-specializations" : [
             {
               "value" : {
-                "solid" : "srgb:0.09020,0.27843,0.89804,1.00000"
+                "solid" : "extended-gray:1.00000,1.00000"
               }
             },
             {
