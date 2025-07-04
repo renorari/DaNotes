@@ -36,6 +36,7 @@ struct ContentView: View {
             }
             .padding()
         }
+        .background(Color(NSColor.textBackgroundColor))
     }
 }
 
