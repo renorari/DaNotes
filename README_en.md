@@ -24,6 +24,8 @@ Markdown text entered in the left text editor is previewed in real-time on the r
 
 ## Screenshots
 
+![App Screenshot](./assets/screenshot.png)
+
 The app features a split layout:
 
 - Left side: Text editor (Markdown input)
