@@ -10,22 +10,17 @@ import MarkdownUI
 
 struct ContentView: View {
     @AppStorage("text") private var text: String = ""
+    @State private var showEditor: Bool = true
     
     var body: some View {
         HStack {
-            TextEditor(text: $text)
-                .font(.system(size: 20))
-                .padding()
-                .toolbar(content: {
-                    ToolbarItem() {
-                        Button("clear", systemImage: "trash") {
-                            text = ""
-                        }
-                        .keyboardShortcut(.delete, modifiers: .command)
-                    }
-                })
-            
-            Divider()
+            if showEditor {
+                TextEditor(text: $text)
+                    .font(.system(size: 20))
+                    .padding()
+                
+                Divider()
+            }
             
             ScrollView {
                 Markdown(text)
@@ -37,6 +32,18 @@ struct ContentView: View {
             .padding()
         }
         .background(Color(NSColor.textBackgroundColor))
+        .toolbar(content: {
+            ToolbarItem() {
+                Toggle("Show editor", systemImage: "pencil.circle", isOn: $showEditor)
+                    .keyboardShortcut("e", modifiers: .command)
+            }
+            ToolbarItem() {
+                Button("clear", systemImage: "trash") {
+                    text = ""
+                }
+                .keyboardShortcut(.delete, modifiers: .command)
+            }
+        })
     }
 }
 
