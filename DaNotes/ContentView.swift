@@ -41,7 +41,7 @@ struct ContentView: View {
             }
             ToolbarItem() {
                 Button("clear", systemImage: "trash") {
-                    if suppressClearConfirmation {
+                    if suppressClearConfirmation || text.isEmpty {
                         text = ""
                     } else {
                         showClearConfirmation = true
