@@ -11,6 +11,8 @@ import MarkdownUI
 struct ContentView: View {
     @AppStorage("text") private var text: String = ""
     @State private var showEditor: Bool = true
+    @State private var showClearConfirmation: Bool = false
+    @AppStorage("SuppressClearConfirmation") private var suppressClearConfirmation: Bool = false
     
     var body: some View {
         HStack {
@@ -39,9 +41,20 @@ struct ContentView: View {
             }
             ToolbarItem() {
                 Button("clear", systemImage: "trash") {
-                    text = ""
+                    if suppressClearConfirmation {
+                        text = ""
+                    } else {
+                        showClearConfirmation = true
+                    }
                 }
                 .keyboardShortcut(.delete, modifiers: .command)
+                .confirmationDialog("Are you sure you want to clear the text?", isPresented: $showClearConfirmation) {
+                    Button("Clear", role: .destructive) {
+                        text = ""
+                    }
+                }
+                .dialogIcon(Image(systemName: "trash.circle.fill"))
+                .dialogSuppressionToggle(isSuppressed: $suppressClearConfirmation)
             }
         })
     }
