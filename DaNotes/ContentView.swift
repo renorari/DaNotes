@@ -36,11 +36,11 @@ struct ContentView: View {
         .background(Color(NSColor.textBackgroundColor))
         .toolbar(content: {
             ToolbarItem() {
-                Toggle("Show editor", systemImage: "pencil.circle", isOn: $showEditor)
+                Toggle(.showEditor, systemImage: "pencil.circle", isOn: $showEditor)
                     .keyboardShortcut("e", modifiers: .command)
             }
             ToolbarItem() {
-                Button("clear", systemImage: "trash") {
+                Button(.clearButton, systemImage: "trash") {
                     if suppressClearConfirmation || text.isEmpty {
                         text = ""
                     } else {
@@ -48,8 +48,8 @@ struct ContentView: View {
                     }
                 }
                 .keyboardShortcut(.delete, modifiers: .command)
-                .confirmationDialog("Are you sure you want to clear the text?", isPresented: $showClearConfirmation) {
-                    Button("Clear", role: .destructive) {
+                .confirmationDialog(.clearConfirm, isPresented: $showClearConfirmation) {
+                    Button(.clearButton, role: .destructive) {
                         text = ""
                     }
                 }
