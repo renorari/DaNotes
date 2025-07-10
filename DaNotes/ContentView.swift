@@ -33,7 +33,11 @@ struct ContentView: View {
             }
             .padding()
         }
+        #if os(macOS)
         .background(Color(NSColor.textBackgroundColor))
+        #else
+        .background(Color(UIColor.systemBackground))
+        #endif
         .toolbar(content: {
             ToolbarItem() {
                 Toggle(.showEditor, systemImage: "pencil.circle", isOn: $showEditor)
