@@ -33,7 +33,10 @@ struct ContentView: View {
                     .markdownTextStyle(\.emphasis) {
                         BackgroundColor(.yellow.opacity(0.25))
                     }
-                        
+                    .markdownTextStyle(\.code) {
+                        FontFamilyVariant(.monospaced)
+                        BackgroundColor(.secondary.opacity(0.25))
+                    }
             }
             .padding()
         }
