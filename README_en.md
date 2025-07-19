@@ -36,7 +36,7 @@ The app features a split layout:
 1. Launch the app
 2. Enter Markdown text in the left editor
 3. View the instant preview on the right side
-4. To clear text, click the rubbish bin button in the toolbar or press Cmd+Delete
+4. To clear text, click the rubbish bin button in the toolbar or press `⌘ command` + `⌫ delete`
 
 ## Build Instructions
 
