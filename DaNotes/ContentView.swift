@@ -16,69 +16,70 @@ struct ContentView: View {
     @AppStorage("SuppressClearConfirmation") private var suppressClearConfirmation: Bool = false
     
     var body: some View {
-        HStack {
-            if showEditor {
-                TextEditor(text: $text)
-                    .font(.system(size: 20))
-                    .padding()
-            }
-            
-            if showEditor && showView {
-                Divider()
-            }
-            
-            if showView {
-                ScrollView {
-                    Markdown(text)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                        .markdownTextStyle() {
-                            FontSize(20)
-                        }
-                        .markdownTextStyle(\.emphasis) {
-                            BackgroundColor(.yellow.opacity(0.25))
-                        }
-                        .markdownTextStyle(\.code) {
-                            FontFamilyVariant(.monospaced)
-                            BackgroundColor(.secondary.opacity(0.25))
-                        }
+        NavigationStack {
+            HStack {
+                if showEditor {
+                    TextEditor(text: $text)
+                        .font(.system(size: 20))
+                        .padding()
                 }
-                .padding()
+                
+                if showEditor && showView {
+                    Divider()
+                }
+                
+                if showView {
+                    ScrollView {
+                        Markdown(text)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                            .markdownTextStyle() {
+                                FontSize(20)
+                            }
+                            .markdownTextStyle(\.emphasis) {
+                                BackgroundColor(.yellow.opacity(0.25))
+                            }
+                            .markdownTextStyle(\.code) {
+                                FontFamilyVariant(.monospaced)
+                                BackgroundColor(.secondary.opacity(0.25))
+                            }
+                    }
+                    .padding()
+                }
+            }
+            #if os(macOS)
+            .background(Color(NSColor.textBackgroundColor))
+            #else
+            .background(Color(UIColor.systemBackground))
+            #endif
+            .toolbar {
+                ToolbarItemGroup {
+                    Toggle(.showEditor, systemImage: "pencil.circle", isOn: $showEditor)
+                        .keyboardShortcut("e", modifiers: .command)
+                        .disabled(!showView)
+                    Toggle(.showView, systemImage: "text.page", isOn: $showView)
+                        .keyboardShortcut("r", modifiers: .command)
+                        .disabled(!showEditor)
+                }
+                ToolbarSpacer()
+                ToolbarItem() {
+                    Button(.clearButton, systemImage: "trash") {
+                        if suppressClearConfirmation || text.isEmpty {
+                            text = ""
+                        } else {
+                            showClearConfirmation = true
+                        }
+                    }
+                    .keyboardShortcut(.delete, modifiers: .command)
+                    .confirmationDialog(.clearConfirm, isPresented: $showClearConfirmation) {
+                        Button(.clearButton, role: .destructive) {
+                            text = ""
+                        }
+                    }
+                    .dialogIcon(Image(systemName: "trash.circle.fill"))
+                    .dialogSuppressionToggle(isSuppressed: $suppressClearConfirmation)
+                }
             }
         }
-        #if os(macOS)
-        .background(Color(NSColor.textBackgroundColor))
-        #else
-        .background(Color(UIColor.systemBackground))
-        #endif
-        .toolbar(content: {
-            ToolbarItem() {
-                Toggle(.showEditor, systemImage: "pencil.circle", isOn: $showEditor)
-                    .keyboardShortcut("e", modifiers: .command)
-                    .disabled(!showView)
-            }
-            ToolbarItem() {
-                Toggle(.showView, systemImage: "text.page", isOn: $showView)
-                    .keyboardShortcut("r", modifiers: .command)
-                    .disabled(!showEditor)
-            }
-            ToolbarItem() {
-                Button(.clearButton, systemImage: "trash") {
-                    if suppressClearConfirmation || text.isEmpty {
-                        text = ""
-                    } else {
-                        showClearConfirmation = true
-                    }
-                }
-                .keyboardShortcut(.delete, modifiers: .command)
-                .confirmationDialog(.clearConfirm, isPresented: $showClearConfirmation) {
-                    Button(.clearButton, role: .destructive) {
-                        text = ""
-                    }
-                }
-                .dialogIcon(Image(systemName: "trash.circle.fill"))
-                .dialogSuppressionToggle(isSuppressed: $suppressClearConfirmation)
-            }
-        })
     }
 }
 
