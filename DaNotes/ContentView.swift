@@ -11,6 +11,7 @@ import MarkdownUI
 struct ContentView: View {
     @AppStorage("text") private var text: String = ""
     @State private var showEditor: Bool = true
+    @State private var showView: Bool = true
     @State private var showClearConfirmation: Bool = false
     @AppStorage("SuppressClearConfirmation") private var suppressClearConfirmation: Bool = false
     
@@ -20,25 +21,29 @@ struct ContentView: View {
                 TextEditor(text: $text)
                     .font(.system(size: 20))
                     .padding()
-                
+            }
+            
+            if showEditor && showView {
                 Divider()
             }
             
-            ScrollView {
-                Markdown(text)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    .markdownTextStyle() {
-                        FontSize(20)
-                    }
-                    .markdownTextStyle(\.emphasis) {
-                        BackgroundColor(.yellow.opacity(0.25))
-                    }
-                    .markdownTextStyle(\.code) {
-                        FontFamilyVariant(.monospaced)
-                        BackgroundColor(.secondary.opacity(0.25))
-                    }
+            if showView {
+                ScrollView {
+                    Markdown(text)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        .markdownTextStyle() {
+                            FontSize(20)
+                        }
+                        .markdownTextStyle(\.emphasis) {
+                            BackgroundColor(.yellow.opacity(0.25))
+                        }
+                        .markdownTextStyle(\.code) {
+                            FontFamilyVariant(.monospaced)
+                            BackgroundColor(.secondary.opacity(0.25))
+                        }
+                }
+                .padding()
             }
-            .padding()
         }
         #if os(macOS)
         .background(Color(NSColor.textBackgroundColor))
@@ -49,6 +54,12 @@ struct ContentView: View {
             ToolbarItem() {
                 Toggle(.showEditor, systemImage: "pencil.circle", isOn: $showEditor)
                     .keyboardShortcut("e", modifiers: .command)
+                    .disabled(!showView)
+            }
+            ToolbarItem() {
+                Toggle(.showView, systemImage: "text.page", isOn: $showView)
+                    .keyboardShortcut("r", modifiers: .command)
+                    .disabled(!showEditor)
             }
             ToolbarItem() {
                 Button(.clearButton, systemImage: "trash") {

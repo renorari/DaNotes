@@ -41,13 +41,30 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Show Editor"
+            "value" : "Show editor"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "エディタを表示"
+          }
+        }
+      }
+    },
+    "showView" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show preview"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プレビューを表示"
           }
         }
       }
