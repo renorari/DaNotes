@@ -35,6 +35,23 @@
         }
       }
     },
+    "exportMD" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Export to Markdown file"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Markdownとして保存"
+          }
+        }
+      }
+    },
     "exportPDF" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -47,7 +64,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "PDFに保存"
+            "value" : "PDFとして保存"
           }
         }
       }

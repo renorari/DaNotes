@@ -64,10 +64,16 @@ struct ContentView: View {
             .padding(.horizontal)
             #endif
             .toolbar {
-                ToolbarItem(placement: .navigation) {
+                ToolbarItemGroup(placement: .navigation) {
+                    Button(.exportMD, systemImage: "square.and.arrow.down") {
+                        exportMD()
+                    }
+                    .keyboardShortcut("s", modifiers: .command)
+                    .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     Button(.exportPDF, systemImage: "arrow.down.document") {
                         exportPDF()
                     }
+                    .keyboardShortcut("s", modifiers: [.command, .shift])
                     .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
                 ToolbarSpacer()
@@ -131,7 +137,7 @@ private extension ContentView {
         do {
             let pdfData = try PDFExporter.render(text: text)
 #if os(macOS)
-            presentSavePanel(with: pdfData)
+            presentSavePanel(with: pdfData, contentType: .pdf, fileExtension: "pdf")
 #else
             let url = try PDFExporter.writeTemporary(data: pdfData, fileName: defaultExportFileName())
             shareItem = ShareItem(url: url)
@@ -141,11 +147,32 @@ private extension ContentView {
         }
     }
 
+    @MainActor
+    func exportMD() {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            handleExportError(PDFExportError.emptyContent)
+            return
+        }
+
+        let data = Data(text.utf8)
 #if os(macOS)
-    func presentSavePanel(with data: Data) {
+        presentSavePanel(with: data, contentType: .text, fileExtension: "md")
+#else
+        do {
+            let url = try writeTemporaryMarkdown(data: data, fileName: defaultExportFileName())
+            shareItem = ShareItem(url: url)
+        } catch {
+            handleExportError(error)
+        }
+#endif
+    }
+
+#if os(macOS)
+    func presentSavePanel(with data: Data, contentType: UTType, fileExtension: String) {
         let panel = NSSavePanel()
-        panel.allowedContentTypes = [.pdf]
-        panel.nameFieldStringValue = defaultExportFileName()
+        panel.allowedContentTypes = [contentType]
+        panel.nameFieldStringValue = "\(defaultExportFileName()).\(fileExtension)"
         panel.begin { response in
             guard response == .OK, let url = panel.url else { return }
             do {
@@ -172,6 +199,12 @@ private extension ContentView {
     }
 
 #if os(iOS)
+    func writeTemporaryMarkdown(data: Data, fileName: String) throws -> URL {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(fileName).md")
+        try data.write(to: url, options: .atomic)
+        return url
+    }
+
     func cleanUpShareURL() {
         if let url = shareItem?.url {
             try? FileManager.default.removeItem(at: url)
