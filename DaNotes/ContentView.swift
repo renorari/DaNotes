@@ -21,11 +21,10 @@ struct ContentView: View {
                 if showEditor {
                     TextEditor(text: $text)
                         .font(.system(size: 20))
-                        .padding()
                 }
                 
                 if showEditor && showView {
-                    Divider()
+                    Divider().padding(.horizontal)
                 }
                 
                 if showView {
@@ -43,9 +42,9 @@ struct ContentView: View {
                                 BackgroundColor(.secondary.opacity(0.25))
                             }
                     }
-                    .padding()
                 }
             }
+            .padding(.horizontal)
             #if os(macOS)
             .background(Color(NSColor.textBackgroundColor))
             #else
