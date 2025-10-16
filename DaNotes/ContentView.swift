@@ -21,11 +21,10 @@ struct ContentView: View {
                 if showEditor {
                     TextEditor(text: $text)
                         .font(.system(size: 20))
-                        .padding()
                 }
                 
                 if showEditor && showView {
-                    Divider()
+                    Divider().padding(.horizontal)
                 }
                 
                 if showView {
@@ -43,13 +42,14 @@ struct ContentView: View {
                                 BackgroundColor(.secondary.opacity(0.25))
                             }
                     }
-                    .padding()
                 }
             }
             #if os(macOS)
             .background(Color(NSColor.textBackgroundColor))
+            .padding()
             #else
             .background(Color(UIColor.systemBackground))
+            .padding(.horizontal)
             #endif
             .toolbar {
                 ToolbarItemGroup {
