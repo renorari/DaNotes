@@ -7,6 +7,14 @@
 
 import SwiftUI
 import MarkdownUI
+import PDFKit
+import UniformTypeIdentifiers
+#if os(macOS)
+import AppKit
+#endif
+#if os(iOS)
+import UIKit
+#endif
 
 struct ContentView: View {
     @AppStorage("text") private var text: String = ""
@@ -14,6 +22,10 @@ struct ContentView: View {
     @State private var showView: Bool = true
     @State private var showClearConfirmation: Bool = false
     @AppStorage("SuppressClearConfirmation") private var suppressClearConfirmation: Bool = false
+#if os(iOS)
+    @State private var shareItem: ShareItem?
+#endif
+    @State private var exportErrorMessage: String?
     
     var body: some View {
         NavigationStack {
@@ -52,6 +64,13 @@ struct ContentView: View {
             .padding(.horizontal)
             #endif
             .toolbar {
+                ToolbarItem(placement: .navigation) {
+                    Button(.exportPDF, systemImage: "arrow.down.document") {
+                        exportPDF()
+                    }
+                    .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+                ToolbarSpacer()
                 ToolbarItemGroup {
                     Toggle(.showEditor, systemImage: "pencil.circle", isOn: $showEditor)
                         .keyboardShortcut("e", modifiers: .command)
@@ -79,6 +98,25 @@ struct ContentView: View {
                     .dialogSuppressionToggle(isSuppressed: $suppressClearConfirmation)
                 }
             }
+#if os(iOS)
+            .sheet(item: $shareItem, onDismiss: cleanUpShareURL) { item in
+                ShareSheet(activityItems: [item.url]) {
+                    cleanUpShareURL()
+                }
+            }
+#endif
+            .alert("PDF export failed", isPresented: Binding(
+                get: { exportErrorMessage != nil },
+                set: { newValue in
+                    if !newValue {
+                        exportErrorMessage = nil
+                    }
+                }
+            )) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(exportErrorMessage ?? "")
+            }
         }
     }
 }
@@ -86,3 +124,159 @@ struct ContentView: View {
 #Preview {
     ContentView()
 }
+
+private extension ContentView {
+    @MainActor
+    func exportPDF() {
+        do {
+            let pdfData = try PDFExporter.render(text: text)
+#if os(macOS)
+            presentSavePanel(with: pdfData)
+#else
+            let url = try PDFExporter.writeTemporary(data: pdfData, fileName: defaultExportFileName())
+            shareItem = ShareItem(url: url)
+#endif
+        } catch {
+            handleExportError(error)
+        }
+    }
+
+#if os(macOS)
+    func presentSavePanel(with data: Data) {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.pdf]
+        panel.nameFieldStringValue = defaultExportFileName()
+        panel.begin { response in
+            guard response == .OK, let url = panel.url else { return }
+            do {
+                try data.write(to: url, options: .atomic)
+            } catch {
+                handleExportError(error)
+            }
+        }
+    }
+#endif
+
+    func handleExportError(_ error: Error) {
+        if let localized = error as? LocalizedError, let description = localized.errorDescription {
+            exportErrorMessage = description
+        } else {
+            exportErrorMessage = error.localizedDescription
+        }
+    }
+
+    func defaultExportFileName() -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMdd_HHmmss"
+        return "DaNotes_\(formatter.string(from: Date()))"
+    }
+
+#if os(iOS)
+    func cleanUpShareURL() {
+        if let url = shareItem?.url {
+            try? FileManager.default.removeItem(at: url)
+        }
+        shareItem = nil
+    }
+#endif
+}
+
+private struct MarkdownExportView: View {
+    let text: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Markdown(text.isEmpty ? " " : text)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .markdownTextStyle() {
+                    FontSize(20)
+                }
+                .markdownTextStyle(\.emphasis) {
+                    BackgroundColor(.yellow.opacity(0.25))
+                }
+                .markdownTextStyle(\.code) {
+                    FontFamilyVariant(.monospaced)
+                    BackgroundColor(.secondary.opacity(0.25))
+                }
+        }
+        .padding(32)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white)
+    }
+}
+
+private enum PDFExportError: LocalizedError {
+    case emptyContent
+    case failedToRenderImage
+    case failedToCreatePage
+    case failedToCreateDocument
+
+    var errorDescription: String? {
+        switch self {
+        case .emptyContent:
+            return "Nothing to export."
+        case .failedToRenderImage:
+            return "Failed to render the preview for export."
+        case .failedToCreatePage:
+            return "Could not build the PDF page."
+        case .failedToCreateDocument:
+            return "Could not build the PDF document."
+        }
+    }
+}
+
+private enum PDFExporter {
+    @MainActor
+    static func render(text: String) throws -> Data {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { throw PDFExportError.emptyContent }
+
+        let renderer = ImageRenderer(content: MarkdownExportView(text: text))
+        renderer.scale = 2
+        renderer.proposedSize = ProposedViewSize(width: 595, height: nil)
+
+#if os(macOS)
+        guard let image = renderer.nsImage else { throw PDFExportError.failedToRenderImage }
+#else
+        guard let image = renderer.uiImage else { throw PDFExportError.failedToRenderImage }
+#endif
+        guard let page = PDFPage(image: image) else { throw PDFExportError.failedToCreatePage }
+
+        let document = PDFDocument()
+        document.insert(page, at: 0)
+        guard let data = document.dataRepresentation() else { throw PDFExportError.failedToCreateDocument }
+        return data
+    }
+
+#if os(iOS)
+    static func writeTemporary(data: Data, fileName: String) throws -> URL {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(fileName).pdf")
+        try data.write(to: url, options: .atomic)
+        return url
+    }
+#endif
+}
+
+#if os(iOS)
+private struct ShareItem: Identifiable {
+    let id = UUID()
+    let url: URL
+}
+
+private struct ShareSheet: UIViewControllerRepresentable {
+    let activityItems: [Any]
+    let completion: () -> Void
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        let controller = UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
+        controller.completionWithItemsHandler = { _, _, _, _ in
+            completion()
+        }
+        return controller
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {
+        // Nothing to update
+    }
+}
+#endif
