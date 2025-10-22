@@ -33,6 +33,7 @@ struct ContentView: View {
                 if showEditor {
                     TextEditor(text: $text)
                         .font(.system(size: 20))
+                        .textEditorStyle(.plain)
                 }
                 
                 if showEditor && showView {
@@ -57,10 +58,8 @@ struct ContentView: View {
                 }
             }
             #if os(macOS)
-            .background(Color(NSColor.textBackgroundColor))
             .padding()
             #else
-            .background(Color(UIColor.systemBackground))
             .padding(.horizontal)
             #endif
             .toolbar {
