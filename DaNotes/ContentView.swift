@@ -7,8 +7,8 @@
 
 import SwiftUI
 import MarkdownUI
-import PDFKit
 import UniformTypeIdentifiers
+import CoreGraphics
 #if os(macOS)
 import AppKit
 #endif
@@ -239,45 +239,71 @@ private struct MarkdownExportView: View {
 
 private enum PDFExportError: LocalizedError {
     case emptyContent
-    case failedToRenderImage
-    case failedToCreatePage
-    case failedToCreateDocument
+    case failedToCreateConsumer
+    case failedToCreateContext
+    case failedToWriteDocument
 
     var errorDescription: String? {
         switch self {
         case .emptyContent:
             return "Nothing to export."
-        case .failedToRenderImage:
-            return "Failed to render the preview for export."
-        case .failedToCreatePage:
-            return "Could not build the PDF page."
-        case .failedToCreateDocument:
+        case .failedToCreateConsumer:
+            return "Failed to configure the PDF writer."
+        case .failedToCreateContext:
+            return "Could not create the PDF graphics context."
+        case .failedToWriteDocument:
             return "Could not build the PDF document."
         }
     }
 }
 
 private enum PDFExporter {
+    private static var pageWidth: CGFloat = 595; // A4 Paper
+
     @MainActor
     static func render(text: String) throws -> Data {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { throw PDFExportError.emptyContent }
 
         let renderer = ImageRenderer(content: MarkdownExportView(text: text))
-        renderer.scale = 2
-        renderer.proposedSize = ProposedViewSize(width: 595, height: nil)
+        renderer.proposedSize = ProposedViewSize(width: pageWidth, height: nil)
 
-#if os(macOS)
-        guard let image = renderer.nsImage else { throw PDFExportError.failedToRenderImage }
-#else
-        guard let image = renderer.uiImage else { throw PDFExportError.failedToRenderImage }
-#endif
-        guard let page = PDFPage(image: image) else { throw PDFExportError.failedToCreatePage }
+        let data = NSMutableData()
+        var capturedError: Error?
 
-        let document = PDFDocument()
-        document.insert(page, at: 0)
-        guard let data = document.dataRepresentation() else { throw PDFExportError.failedToCreateDocument }
-        return data
+        renderer.render { size, render in
+            do {
+                var mediaBox = CGRect(origin: .zero, size: size)
+                guard mediaBox.width > 0, mediaBox.height > 0 else {
+                    throw PDFExportError.failedToWriteDocument
+                }
+                guard let consumer = CGDataConsumer(data: data as CFMutableData) else {
+                    throw PDFExportError.failedToCreateConsumer
+                }
+
+                guard let context = CGContext(consumer: consumer, mediaBox: &mediaBox, nil) else {
+                    throw PDFExportError.failedToCreateContext
+                }
+
+                defer { context.closePDF() }
+
+                context.beginPDFPage(nil)
+                render(context)
+                context.endPDFPage()
+            } catch {
+                capturedError = error
+            }
+        }
+
+        if let capturedError {
+            throw capturedError
+        }
+
+        guard data.length > 0 else {
+            throw PDFExportError.failedToWriteDocument
+        }
+
+        return data as Data
     }
 
 #if os(iOS)
