@@ -20,7 +20,7 @@ DaNotesは、SwiftUIで作られたMac用のMarkdownリアルタイムエディ�
 - **フレームワーク**: SwiftUI
 - **対応OS**: macOS 26 以降
 - **外部ライブラリ**:
-  - [swift-markdown-ui](https://github.com/gonzalezreal/swift-markdown-ui) - Markdownレンダリング
+  - [Textual](https://github.com/gonzalezreal/textual) - Markdownレンダリング
 
 ## スクリーンショット
 

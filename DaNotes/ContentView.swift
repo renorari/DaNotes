@@ -6,7 +6,7 @@
 //
 
 import SwiftUI
-import MarkdownUI
+import Textual
 import UniformTypeIdentifiers
 import CoreGraphics
 #if os(macOS)
@@ -42,18 +42,17 @@ struct ContentView: View {
                 
                 if showView {
                     ScrollView {
-                        Markdown(text)
+                        StructuredText(
+                            markdown: text,
+                            syntaxExtensions: [.math]
+                        )
+                            .font(.system(size: 20))
+                            .textual.inlineStyle(
+                                InlineStyle()
+                                    .emphasis(.italic, .backgroundColor(.yellow.opacity(0.25)))
+                                    .code(.monospaced, .backgroundColor(.secondary.opacity(0.25)))
+                            )
                             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                            .markdownTextStyle() {
-                                FontSize(20)
-                            }
-                            .markdownTextStyle(\.emphasis) {
-                                BackgroundColor(.yellow.opacity(0.25))
-                            }
-                            .markdownTextStyle(\.code) {
-                                FontFamilyVariant(.monospaced)
-                                BackgroundColor(.secondary.opacity(0.25))
-                            }
                     }
                 }
             }
@@ -218,18 +217,17 @@ private struct MarkdownExportView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Markdown(text.isEmpty ? " " : text)
+            StructuredText(
+                markdown: text.isEmpty ? " " : text,
+                syntaxExtensions: [.math]
+            )
+                .font(.system(size: 20))
+                .textual.inlineStyle(
+                    InlineStyle()
+                        .emphasis(.italic, .backgroundColor(.yellow.opacity(0.25)))
+                        .code(.monospaced, .backgroundColor(.secondary.opacity(0.25)))
+                )
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .markdownTextStyle() {
-                    FontSize(20)
-                }
-                .markdownTextStyle(\.emphasis) {
-                    BackgroundColor(.yellow.opacity(0.25))
-                }
-                .markdownTextStyle(\.code) {
-                    FontFamilyVariant(.monospaced)
-                    BackgroundColor(.secondary.opacity(0.25))
-                }
         }
         .padding(32)
         .frame(maxWidth: .infinity, alignment: .leading)

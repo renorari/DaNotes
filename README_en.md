@@ -20,7 +20,7 @@ Markdown text entered in the left text editor is previewed in real-time on the r
 - **Framework**: SwiftUI
 - **Supported OS**: macOS 26 or later
 - **External Libraries**:
-  - [swift-markdown-ui](https://github.com/gonzalezreal/swift-markdown-ui) - Markdown rendering
+  - [Textual](https://github.com/gonzalezreal/textual) - Markdown rendering
 
 ## Screenshots
 

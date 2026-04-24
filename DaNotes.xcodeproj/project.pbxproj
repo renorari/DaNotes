@@ -7,8 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		B742040C2E163A5200D31BC6 /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = B742040B2E163A5200D31BC6 /* MarkdownUI */; };
 		B74204292E16675F00D31BC6 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = B74204282E16675F00D31BC6 /* AppIcon.icon */; };
+		B747D0802F9AEDEB0043003A /* Textual in Frameworks */ = {isa = PBXBuildFile; productRef = B747D07F2F9AEDEB0043003A /* Textual */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -29,7 +29,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				B742040C2E163A5200D31BC6 /* MarkdownUI in Frameworks */,
+				B747D0802F9AEDEB0043003A /* Textual in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -73,7 +73,7 @@
 			);
 			name = DaNotes;
 			packageProductDependencies = (
-				B742040B2E163A5200D31BC6 /* MarkdownUI */,
+				B747D07F2F9AEDEB0043003A /* Textual */,
 			);
 			productName = DaNotes;
 			productReference = B75336482E161863005E9DE7 /* DaNotes.app */;
@@ -105,7 +105,7 @@
 			mainGroup = B753363F2E161863005E9DE7;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				B742040A2E163A5200D31BC6 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */,
+				B747D07E2F9AEDEB0043003A /* XCRemoteSwiftPackageReference "textual" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = B75336492E161863005E9DE7 /* Products */;
@@ -400,21 +400,21 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		B742040A2E163A5200D31BC6 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */ = {
+		B747D07E2F9AEDEB0043003A /* XCRemoteSwiftPackageReference "textual" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/gonzalezreal/swift-markdown-ui.git";
+			repositoryURL = "https://github.com/gonzalezreal/textual";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 2.4.1;
+				minimumVersion = 0.3.1;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		B742040B2E163A5200D31BC6 /* MarkdownUI */ = {
+		B747D07F2F9AEDEB0043003A /* Textual */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = B742040A2E163A5200D31BC6 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */;
-			productName = MarkdownUI;
+			package = B747D07E2F9AEDEB0043003A /* XCRemoteSwiftPackageReference "textual" */;
+			productName = Textual;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
