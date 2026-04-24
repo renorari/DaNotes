@@ -1,6 +1,23 @@
 {
   "sourceLanguage" : "ja",
   "strings" : {
+    "addImage" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add an image"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画像を追加"
+          }
+        }
+      }
+    },
     "clearButton" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -68,6 +85,9 @@
           }
         }
       }
+    },
+    "Image import failed" : {
+
     },
     "OK" : {
       "localizations" : {

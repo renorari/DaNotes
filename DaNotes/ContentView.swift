@@ -9,9 +9,6 @@ import SwiftUI
 import Textual
 import UniformTypeIdentifiers
 import CoreGraphics
-#if os(macOS)
-import AppKit
-#endif
 #if os(iOS)
 import UIKit
 #endif
@@ -21,11 +18,13 @@ struct ContentView: View {
     @State private var showEditor: Bool = true
     @State private var showView: Bool = true
     @State private var showClearConfirmation: Bool = false
+    @State private var showImageImporter: Bool = false
     @AppStorage("SuppressClearConfirmation") private var suppressClearConfirmation: Bool = false
 #if os(iOS)
     @State private var shareItem: ShareItem?
 #endif
     @State private var exportErrorMessage: String?
+    @State private var imageImportErrorMessage: String?
     
     var body: some View {
         NavigationStack {
@@ -42,7 +41,7 @@ struct ContentView: View {
                 
                 if showView {
                     ScrollView {
-                        MarkdownText(markdown: text)
+                        MarkdownText(markdown: text, baseURL: ImageAttachmentStore.shared.baseURL)
                             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     }
                 }
@@ -67,6 +66,12 @@ struct ContentView: View {
                 }
                 ToolbarSpacer()
                 ToolbarItemGroup {
+                    Button(.addImage, systemImage: "photo.badge.plus") {
+                        showImageImporter = true
+                    }
+                }
+                ToolbarSpacer()
+                ToolbarItemGroup {
                     Toggle(.showEditor, systemImage: "pencil.circle", isOn: $showEditor)
                         .keyboardShortcut("e", modifiers: .command)
                         .disabled(!showView)
@@ -78,7 +83,7 @@ struct ContentView: View {
                 ToolbarItem() {
                     Button(.clearButton, systemImage: "trash") {
                         if suppressClearConfirmation || text.isEmpty {
-                            text = ""
+                            clearAllContent()
                         } else {
                             showClearConfirmation = true
                         }
@@ -86,7 +91,7 @@ struct ContentView: View {
                     .keyboardShortcut(.delete, modifiers: .command)
                     .confirmationDialog(.clearConfirm, isPresented: $showClearConfirmation) {
                         Button(.clearButton, role: .destructive) {
-                            text = ""
+                            clearAllContent()
                         }
                     }
                     .dialogIcon(Image(systemName: "trash.circle.fill"))
@@ -100,6 +105,15 @@ struct ContentView: View {
                 }
             }
 #endif
+            .fileImporter(isPresented: $showImageImporter, allowedContentTypes: [.image], allowsMultipleSelection: false) { result in
+                switch result {
+                case .success(let urls):
+                    guard let url = urls.first else { return }
+                    importImage(from: url)
+                case .failure(let error):
+                    handleImageImportError(error)
+                }
+            }
             .alert("PDF export failed", isPresented: Binding(
                 get: { exportErrorMessage != nil },
                 set: { newValue in
@@ -111,6 +125,18 @@ struct ContentView: View {
                 Button("OK", role: .cancel) { }
             } message: {
                 Text(exportErrorMessage ?? "")
+            }
+            .alert("Image import failed", isPresented: Binding(
+                get: { imageImportErrorMessage != nil },
+                set: { newValue in
+                    if !newValue {
+                        imageImportErrorMessage = nil
+                    }
+                }
+            )) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(imageImportErrorMessage ?? "")
             }
         }
     }
@@ -181,6 +207,43 @@ private extension ContentView {
         }
     }
 
+    func handleImageImportError(_ error: Error) {
+        imageImportErrorMessage = error.localizedDescription
+    }
+
+    func insertImageMarkdown(relativePath: String) {
+        let imageMarkdown = "![image](\(relativePath))"
+
+        if text.isEmpty {
+            text = imageMarkdown
+        } else if text.hasSuffix("\n") {
+            text += imageMarkdown
+        } else {
+            text += "\n\n\(imageMarkdown)"
+        }
+    }
+
+    func importImage(from url: URL) {
+        let didStartAccessingResource = url.startAccessingSecurityScopedResource()
+        defer {
+            if didStartAccessingResource {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
+
+        do {
+            let storedURL = try ImageAttachmentStore.shared.storeCopiedImage(from: url)
+            insertImageMarkdown(relativePath: storedURL.lastPathComponent)
+        } catch {
+            handleImageImportError(error)
+        }
+    }
+
+    func clearAllContent() {
+        text = ""
+        ImageAttachmentStore.shared.removeAllAttachments()
+    }
+
     func defaultExportFileName() -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyyMMdd_HHmmss"
@@ -208,7 +271,7 @@ private struct MarkdownExportView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            MarkdownText(markdown: text.isEmpty ? " " : text)
+            MarkdownText(markdown: text.isEmpty ? " " : text, baseURL: ImageAttachmentStore.shared.baseURL)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(32)
@@ -219,18 +282,62 @@ private struct MarkdownExportView: View {
 
 private struct MarkdownText: View {
     let markdown: String
+    let baseURL: URL
 
     var body: some View {
-        StructuredText(
-            markdown: markdown,
-            syntaxExtensions: [.math]
-        )
+        StructuredText(markdown: markdown, baseURL: baseURL, syntaxExtensions: [.math])
+            .textual.imageAttachmentLoader(.image(relativeTo: baseURL))
             .font(.system(size: 20))
             .textual.inlineStyle(
                 InlineStyle()
                     .emphasis(.italic, .backgroundColor(.yellow.opacity(0.25)))
                     .code(.monospaced, .backgroundColor(.secondary.opacity(0.25)))
             )
+    }
+}
+
+private struct ImageAttachmentStore {
+    static let shared = ImageAttachmentStore()
+
+    let baseURL: URL
+
+    private init() {
+        let fileManager = FileManager.default
+        let supportDirectory = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? fileManager.temporaryDirectory
+        let attachmentsDirectory = supportDirectory
+            .appendingPathComponent("DaNotes", isDirectory: true)
+            .appendingPathComponent("Attachments", isDirectory: true)
+
+        try? fileManager.createDirectory(at: attachmentsDirectory, withIntermediateDirectories: true)
+        self.baseURL = attachmentsDirectory
+    }
+
+    func storeCopiedImage(from sourceURL: URL) throws -> URL {
+        let fileManager = FileManager.default
+        let extensionValue = sourceURL.pathExtension
+        let fileName = extensionValue.isEmpty
+            ? UUID().uuidString
+            : "\(UUID().uuidString).\(extensionValue.lowercased())"
+        let destinationURL = baseURL.appendingPathComponent(fileName)
+
+        try fileManager.copyItem(at: sourceURL, to: destinationURL)
+        return destinationURL
+    }
+
+    func removeAllAttachments() {
+        let fileManager = FileManager.default
+        guard let urls = try? fileManager.contentsOfDirectory(
+            at: baseURL,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        ) else {
+            return
+        }
+
+        for url in urls {
+            try? fileManager.removeItem(at: url)
+        }
     }
 }
 
