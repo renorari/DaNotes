@@ -10,6 +10,7 @@ import Textual
 import UniformTypeIdentifiers
 import CoreGraphics
 #if os(iOS)
+import PhotosUI
 import UIKit
 #endif
 
@@ -18,10 +19,11 @@ struct ContentView: View {
     @State private var showEditor: Bool = true
     @State private var showView: Bool = true
     @State private var showClearConfirmation: Bool = false
-    @State private var showImageImporter: Bool = false
+    @State private var showImagePicker: Bool = false
     @AppStorage("SuppressClearConfirmation") private var suppressClearConfirmation: Bool = false
 #if os(iOS)
     @State private var shareItem: ShareItem?
+    @State private var selectedPhotoItem: PhotosPickerItem?
 #endif
     @State private var exportErrorMessage: String?
     @State private var imageImportErrorMessage: String?
@@ -67,7 +69,7 @@ struct ContentView: View {
                 ToolbarSpacer()
                 ToolbarItemGroup {
                     Button(.addImage, systemImage: "photo.badge.plus") {
-                        showImageImporter = true
+                        showImagePicker = true
                     }
                 }
                 ToolbarSpacer()
@@ -104,8 +106,22 @@ struct ContentView: View {
                     cleanUpShareURL()
                 }
             }
+
+            .photosPicker(
+                isPresented: $showImagePicker,
+                selection: $selectedPhotoItem,
+                matching: .images,
+                preferredItemEncoding: .current
+            )
+            .onChange(of: selectedPhotoItem) { _, newItem in
+                guard let newItem else { return }
+                Task {
+                    await importImage(from: newItem)
+                }
+            }
 #endif
-            .fileImporter(isPresented: $showImageImporter, allowedContentTypes: [.image], allowsMultipleSelection: false) { result in
+#if os(macOS)
+            .fileImporter(isPresented: $showImagePicker, allowedContentTypes: [.image], allowsMultipleSelection: false) { result in
                 switch result {
                 case .success(let urls):
                     guard let url = urls.first else { return }
@@ -114,6 +130,7 @@ struct ContentView: View {
                     handleImageImportError(error)
                 }
             }
+#endif
             .alert("PDF export failed", isPresented: Binding(
                 get: { exportErrorMessage != nil },
                 set: { newValue in
@@ -239,6 +256,27 @@ private extension ContentView {
         }
     }
 
+#if os(iOS)
+    @MainActor
+    func importImage(from photoItem: PhotosPickerItem) async {
+        defer {
+            selectedPhotoItem = nil
+        }
+
+        do {
+            guard let data = try await photoItem.loadTransferable(type: Data.self) else {
+                throw NSError(domain: "DaNotes.ImageImport", code: 3, userInfo: [NSLocalizedDescriptionKey: "Could not read the selected photo."])
+            }
+
+            let ext = photoItem.supportedContentTypes.first?.preferredFilenameExtension ?? "jpg"
+            let storedURL = try ImageAttachmentStore.shared.storeImageData(data, fileExtension: ext)
+            insertImageMarkdown(relativePath: storedURL.lastPathComponent)
+        } catch {
+            handleImageImportError(error)
+        }
+    }
+#endif
+
     func clearAllContent() {
         text = ""
         ImageAttachmentStore.shared.removeAllAttachments()
@@ -322,6 +360,17 @@ private struct ImageAttachmentStore {
         let destinationURL = baseURL.appendingPathComponent(fileName)
 
         try fileManager.copyItem(at: sourceURL, to: destinationURL)
+        return destinationURL
+    }
+
+    func storeImageData(_ data: Data, fileExtension: String) throws -> URL {
+        let normalizedExtension = fileExtension.lowercased()
+        let fileName = normalizedExtension.isEmpty
+            ? UUID().uuidString
+            : "\(UUID().uuidString).\(normalizedExtension)"
+        let destinationURL = baseURL.appendingPathComponent(fileName)
+
+        try data.write(to: destinationURL, options: .atomic)
         return destinationURL
     }
 
