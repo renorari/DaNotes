@@ -42,16 +42,7 @@ struct ContentView: View {
                 
                 if showView {
                     ScrollView {
-                        StructuredText(
-                            markdown: text,
-                            syntaxExtensions: [.math]
-                        )
-                            .font(.system(size: 20))
-                            .textual.inlineStyle(
-                                InlineStyle()
-                                    .emphasis(.italic, .backgroundColor(.yellow.opacity(0.25)))
-                                    .code(.monospaced, .backgroundColor(.secondary.opacity(0.25)))
-                            )
+                        MarkdownText(markdown: text)
                             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     }
                 }
@@ -217,21 +208,29 @@ private struct MarkdownExportView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            StructuredText(
-                markdown: text.isEmpty ? " " : text,
-                syntaxExtensions: [.math]
-            )
-                .font(.system(size: 20))
-                .textual.inlineStyle(
-                    InlineStyle()
-                        .emphasis(.italic, .backgroundColor(.yellow.opacity(0.25)))
-                        .code(.monospaced, .backgroundColor(.secondary.opacity(0.25)))
-                )
+            MarkdownText(markdown: text.isEmpty ? " " : text)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(32)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.white)
+    }
+}
+
+private struct MarkdownText: View {
+    let markdown: String
+
+    var body: some View {
+        StructuredText(
+            markdown: markdown,
+            syntaxExtensions: [.math]
+        )
+            .font(.system(size: 20))
+            .textual.inlineStyle(
+                InlineStyle()
+                    .emphasis(.italic, .backgroundColor(.yellow.opacity(0.25)))
+                    .code(.monospaced, .backgroundColor(.secondary.opacity(0.25)))
+            )
     }
 }
 
