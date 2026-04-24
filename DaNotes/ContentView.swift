@@ -44,6 +44,7 @@ struct ContentView: View {
                 if showView {
                     ScrollView {
                         MarkdownText(markdown: text, baseURL: ImageAttachmentStore.shared.baseURL)
+                            .id(text)
                             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     }
                 }
