@@ -8,7 +8,6 @@
 import SwiftUI
 import Textual
 import UniformTypeIdentifiers
-import CoreGraphics
 #if os(iOS)
 import PhotosUI
 import UIKit
@@ -60,11 +59,6 @@ struct ContentView: View {
                         exportMD()
                     }
                     .keyboardShortcut("s", modifiers: .command)
-                    .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    Button(.exportPDF, systemImage: "arrow.down.document") {
-                        exportPDF()
-                    }
-                    .keyboardShortcut("s", modifiers: [.command, .shift])
                     .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
                 ToolbarSpacer()
@@ -132,18 +126,6 @@ struct ContentView: View {
                 }
             }
 #endif
-            .alert("PDF export failed", isPresented: Binding(
-                get: { exportErrorMessage != nil },
-                set: { newValue in
-                    if !newValue {
-                        exportErrorMessage = nil
-                    }
-                }
-            )) {
-                Button("OK", role: .cancel) { }
-            } message: {
-                Text(exportErrorMessage ?? "")
-            }
             .alert("Image import failed", isPresented: Binding(
                 get: { imageImportErrorMessage != nil },
                 set: { newValue in
@@ -166,25 +148,10 @@ struct ContentView: View {
 
 private extension ContentView {
     @MainActor
-    func exportPDF() {
-        do {
-            let pdfData = try PDFExporter.render(text: text)
-#if os(macOS)
-            presentSavePanel(with: pdfData, contentType: .pdf, fileExtension: "pdf")
-#else
-            let url = try PDFExporter.writeTemporary(data: pdfData, fileName: defaultExportFileName())
-            shareItem = ShareItem(url: url)
-#endif
-        } catch {
-            handleExportError(error)
-        }
-    }
-
-    @MainActor
     func exportMD() {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
-            handleExportError(PDFExportError.emptyContent)
+            handleExportError(NSError(domain: "DaNotes.Export", code: 1, userInfo: [NSLocalizedDescriptionKey: "Nothing to export."]))
             return
         }
 
@@ -305,20 +272,6 @@ private extension ContentView {
 #endif
 }
 
-private struct MarkdownExportView: View {
-    let text: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            MarkdownText(markdown: text.isEmpty ? " " : text, baseURL: ImageAttachmentStore.shared.baseURL)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(32)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.white)
-    }
-}
-
 private struct MarkdownText: View {
     let markdown: String
     let baseURL: URL
@@ -389,84 +342,6 @@ private struct ImageAttachmentStore {
             try? fileManager.removeItem(at: url)
         }
     }
-}
-
-private enum PDFExportError: LocalizedError {
-    case emptyContent
-    case failedToCreateConsumer
-    case failedToCreateContext
-    case failedToWriteDocument
-
-    var errorDescription: String? {
-        switch self {
-        case .emptyContent:
-            return "Nothing to export."
-        case .failedToCreateConsumer:
-            return "Failed to configure the PDF writer."
-        case .failedToCreateContext:
-            return "Could not create the PDF graphics context."
-        case .failedToWriteDocument:
-            return "Could not build the PDF document."
-        }
-    }
-}
-
-private enum PDFExporter {
-    private static var pageWidth: CGFloat = 595; // A4 Paper
-
-    @MainActor
-    static func render(text: String) throws -> Data {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { throw PDFExportError.emptyContent }
-
-        let renderer = ImageRenderer(content: MarkdownExportView(text: text))
-        renderer.proposedSize = ProposedViewSize(width: pageWidth, height: nil)
-
-        let data = NSMutableData()
-        var capturedError: Error?
-
-        renderer.render { size, render in
-            do {
-                var mediaBox = CGRect(origin: .zero, size: size)
-                guard mediaBox.width > 0, mediaBox.height > 0 else {
-                    throw PDFExportError.failedToWriteDocument
-                }
-                guard let consumer = CGDataConsumer(data: data as CFMutableData) else {
-                    throw PDFExportError.failedToCreateConsumer
-                }
-
-                guard let context = CGContext(consumer: consumer, mediaBox: &mediaBox, nil) else {
-                    throw PDFExportError.failedToCreateContext
-                }
-
-                defer { context.closePDF() }
-
-                context.beginPDFPage(nil)
-                render(context)
-                context.endPDFPage()
-            } catch {
-                capturedError = error
-            }
-        }
-
-        if let capturedError {
-            throw capturedError
-        }
-
-        guard data.length > 0 else {
-            throw PDFExportError.failedToWriteDocument
-        }
-
-        return data as Data
-    }
-
-#if os(iOS)
-    static func writeTemporary(data: Data, fileName: String) throws -> URL {
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(fileName).pdf")
-        try data.write(to: url, options: .atomic)
-        return url
-    }
-#endif
 }
 
 #if os(iOS)
