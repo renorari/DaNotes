@@ -126,7 +126,7 @@ struct ContentView: View {
                 }
             }
 #endif
-            .alert("Image import failed", isPresented: Binding(
+            .alert(.importImageError, isPresented: Binding(
                 get: { imageImportErrorMessage != nil },
                 set: { newValue in
                     if !newValue {
@@ -134,7 +134,7 @@ struct ContentView: View {
                     }
                 }
             )) {
-                Button("OK", role: .cancel) { }
+                Button(.ok, role: .cancel) { }
             } message: {
                 Text(imageImportErrorMessage ?? "")
             }
