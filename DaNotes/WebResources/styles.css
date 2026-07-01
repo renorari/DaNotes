@@ -18,7 +18,7 @@ body {
 
 body {
   color: -apple-system-label;
-  background: Canvas;
+  background: transparent;
   word-wrap: break-word;
   overflow-wrap: anywhere;
   font-family: -apple-system, BlinkMacSystemFont, sans-serif;
