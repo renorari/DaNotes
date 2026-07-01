@@ -1,0 +1,64 @@
+:root {
+  color-scheme: light dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+*:first-child {
+  margin-top: 0;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  color: -apple-system-label;
+  background: Canvas;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 1.25rem;
+}
+
+h1,
+h2 {
+  border-bottom: 0.1rem solid -apple-system-separator;
+}
+
+em {
+  background: rgba(255, 255, 0, 0.5);
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+th,
+td {
+  border: 0.1rem solid -apple-system-separator;
+}
+
+th {
+  background-color: -apple-system-grouped-background;
+}
+
+body.pdf {
+  background: #ffffff;
+  padding: 0;
+}
+
+@page {
+  size: A4;
+  margin: 18mm 16mm;
+}

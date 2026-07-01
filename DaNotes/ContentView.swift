@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import Textual
 import UniformTypeIdentifiers
 #if os(iOS)
 import PhotosUI
@@ -41,11 +40,8 @@ struct ContentView: View {
                 }
                 
                 if showView {
-                    ScrollView {
-                        MarkdownText(markdown: text, baseURL: ImageAttachmentStore.shared.baseURL)
-                            .id(text)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    }
+                    MarkdownWebView(markdown: text, attachmentsURL: ImageAttachmentStore.shared.baseURL)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
             #if os(macOS)
@@ -138,6 +134,18 @@ struct ContentView: View {
             } message: {
                 Text(imageImportErrorMessage ?? "")
             }
+            .alert(.exportError, isPresented: Binding(
+                get: { exportErrorMessage != nil },
+                set: { newValue in
+                    if !newValue {
+                        exportErrorMessage = nil
+                    }
+                }
+            )) {
+                Button(.ok, role: .cancel) { }
+            } message: {
+                Text(exportErrorMessage ?? "")
+            }
         }
     }
 }
@@ -151,7 +159,7 @@ private extension ContentView {
     func exportMD() {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
-            handleExportError(NSError(domain: "DaNotes.Export", code: 1, userInfo: [NSLocalizedDescriptionKey: "Nothing to export."]))
+            handleExportError(ExportError.emptyContent)
             return
         }
 
@@ -160,7 +168,7 @@ private extension ContentView {
         presentSavePanel(with: data, contentType: .text, fileExtension: "md")
 #else
         do {
-            let url = try writeTemporaryMarkdown(data: data, fileName: defaultExportFileName())
+            let url = try writeTemporaryFile(data: data, fileName: defaultExportFileName(), fileExtension: "md")
             shareItem = ShareItem(url: url)
         } catch {
             handleExportError(error)
@@ -257,8 +265,8 @@ private extension ContentView {
     }
 
 #if os(iOS)
-    func writeTemporaryMarkdown(data: Data, fileName: String) throws -> URL {
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(fileName).md")
+    func writeTemporaryFile(data: Data, fileName: String, fileExtension: String) throws -> URL {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(fileName).\(fileExtension)")
         try data.write(to: url, options: .atomic)
         return url
     }
@@ -270,22 +278,6 @@ private extension ContentView {
         shareItem = nil
     }
 #endif
-}
-
-private struct MarkdownText: View {
-    let markdown: String
-    let baseURL: URL
-
-    var body: some View {
-        StructuredText(markdown: markdown, baseURL: baseURL, syntaxExtensions: [.math])
-            .textual.imageAttachmentLoader(.image(relativeTo: baseURL))
-            .font(.system(size: 20))
-            .textual.inlineStyle(
-                InlineStyle()
-                    .emphasis(.italic, .backgroundColor(.yellow.opacity(0.25)))
-                    .code(.monospaced, .backgroundColor(.secondary.opacity(0.25)))
-            )
-    }
 }
 
 private struct ImageAttachmentStore {
