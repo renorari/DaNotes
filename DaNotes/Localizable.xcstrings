@@ -120,6 +120,40 @@
         }
       }
     },
+    "exportPDF" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Export to PDF file"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PDFとして保存"
+          }
+        }
+      }
+    },
+    "exportPDFFailed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not create the PDF document."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PDFの作成に失敗しました。"
+          }
+        }
+      }
+    },
     "importImageError" : {
       "extractionState" : "manual",
       "localizations" : {

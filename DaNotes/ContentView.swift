@@ -56,6 +56,11 @@ struct ContentView: View {
                     }
                     .keyboardShortcut("s", modifiers: .command)
                     .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    Button(.exportPDF, systemImage: "arrow.down.document") {
+                        exportPDF()
+                    }
+                    .keyboardShortcut("s", modifiers: [.command, .shift])
+                    .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
                 ToolbarSpacer()
                 ToolbarItemGroup {
@@ -174,6 +179,37 @@ private extension ContentView {
             handleExportError(error)
         }
 #endif
+    }
+
+    @MainActor
+    func exportPDF() {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            handleExportError(ExportError.emptyContent)
+            return
+        }
+
+        let exporter = MarkdownPDFExporter(
+            markdown: text,
+            attachmentsURL: ImageAttachmentStore.shared.baseURL
+        )
+        exporter.export { result in
+            switch result {
+            case .success(let data):
+#if os(macOS)
+                presentSavePanel(with: data, contentType: .pdf, fileExtension: "pdf")
+#else
+                do {
+                    let url = try writeTemporaryFile(data: data, fileName: defaultExportFileName(), fileExtension: "pdf")
+                    shareItem = ShareItem(url: url)
+                } catch {
+                    handleExportError(error)
+                }
+#endif
+            case .failure(let error):
+                handleExportError(error)
+            }
+        }
     }
 
 #if os(macOS)

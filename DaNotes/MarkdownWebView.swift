@@ -9,6 +9,11 @@
 import SwiftUI
 import WebKit
 import UniformTypeIdentifiers
+#if os(iOS)
+import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
 
 // MARK: - Shared resources
 
@@ -34,11 +39,14 @@ enum MarkdownWeb {
 
 enum ExportError: LocalizedError {
     case emptyContent
+    case pdfGenerationFailed
 
     var errorDescription: String? {
         switch self {
         case .emptyContent:
             return String(localized: "exportEmpty")
+        case .pdfGenerationFailed:
+            return String(localized: "exportPDFFailed")
         }
     }
 }
@@ -171,8 +179,16 @@ struct MarkdownWebView {
             webView = WKWebView(frame: .zero, configuration: configuration)
             super.init()
             webView.navigationDelegate = self
+            // Let the SwiftUI background show through so the rendered content
+            // blends with the window instead of using WebKit's own (slightly
+            // different) system background, which is visible in dark mode.
 #if os(iOS)
+            webView.isOpaque = false
+            webView.backgroundColor = .clear
+            webView.scrollView.backgroundColor = .clear
             webView.scrollView.keyboardDismissMode = .interactive
+#else
+            webView.setValue(false, forKey: "drawsBackground")
 #endif
             webView.load(URLRequest(url: MarkdownWeb.documentURL))
         }
@@ -218,3 +234,210 @@ extension MarkdownWebView: UIViewRepresentable {
     }
 }
 #endif
+
+// MARK: - PDF export
+
+/// Renders Markdown into an A4, paginated PDF using an off-screen `WKWebView`.
+///
+/// The same template/renderer as the live preview is reused, so Markdown, GFM
+/// tables and MathJax math all appear exactly as on screen. Pagination and page
+/// margins come from the `@page` rules in `styles.css`, honoured by WebKit's
+/// print engine (`NSPrintOperation` on macOS, `UIPrintPageRenderer` on iOS).
+@MainActor
+final class MarkdownPDFExporter: NSObject {
+    /// A4 in PostScript points (72 dpi): 210mm × 297mm.
+    private static let a4 = CGRect(x: 0, y: 0, width: 595.28, height: 841.89)
+
+    private let webView: WKWebView
+    private let markdown: String
+    private var completion: (@MainActor (Result<Data, Error>) -> Void)?
+
+    /// Keeps the exporter alive while the asynchronous render is in flight.
+    private static var liveExporters = Set<MarkdownPDFExporter>()
+
+#if os(macOS)
+    /// Off-screen host window. WKWebView printing hangs unless the view is part
+    /// of a window's view hierarchy and the operation is run modally for it.
+    private var hostWindow: NSWindow?
+    private var pdfOutputURL: URL?
+#endif
+
+    init(markdown: String, attachmentsURL: URL) {
+        self.markdown = markdown
+        let configuration = MarkdownWebConfiguration.make(attachmentsURL: attachmentsURL)
+        webView = WKWebView(frame: Self.a4, configuration: configuration)
+        super.init()
+        configuration.userContentController.add(self, name: "rendered")
+        webView.navigationDelegate = self
+#if os(macOS)
+        // Host the web view in an off-screen window so print rendering works.
+        let window = NSWindow(
+            contentRect: Self.a4,
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        window.isReleasedWhenClosed = false
+        window.contentView = webView
+        window.setFrameOrigin(NSPoint(x: -20000, y: -20000))
+        hostWindow = window
+#endif
+    }
+
+    /// Renders the Markdown and delivers the resulting PDF data on the main actor.
+    func export(completion: @escaping @MainActor (Result<Data, Error>) -> Void) {
+        self.completion = completion
+        Self.liveExporters.insert(self)
+        webView.load(URLRequest(url: MarkdownWeb.documentURL))
+    }
+
+    private func finish(_ result: Result<Data, Error>) {
+        guard completion != nil else { return }
+        webView.navigationDelegate = nil
+        webView.configuration.userContentController.removeAllScriptMessageHandlers()
+        webView.stopLoading()
+#if os(macOS)
+        hostWindow?.contentView = nil
+        hostWindow = nil
+#endif
+        completion?(result)
+        completion = nil
+        Self.liveExporters.remove(self)
+    }
+
+    /// Produces the paginated PDF once the web content has finished rendering.
+    private func generatePDF() {
+#if os(macOS)
+        guard let window = hostWindow else {
+            finish(.failure(ExportError.pdfGenerationFailed))
+            return
+        }
+
+        let printInfo = NSPrintInfo()
+        printInfo.paperSize = NSSize(width: Self.a4.width, height: Self.a4.height)
+        // Page margins are supplied by the `@page` rule in the stylesheet, so
+        // keep the print margins at zero to avoid doubling them up.
+        printInfo.leftMargin = 0
+        printInfo.rightMargin = 0
+        printInfo.topMargin = 0
+        printInfo.bottomMargin = 0
+        printInfo.horizontalPagination = .fit
+        printInfo.verticalPagination = .automatic
+        printInfo.isHorizontallyCentered = false
+        printInfo.isVerticallyCentered = false
+
+        let outputURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("pdf")
+        printInfo.jobDisposition = .save
+        printInfo.dictionary()[NSPrintInfo.AttributeKey.jobSavingURL] = outputURL
+        pdfOutputURL = outputURL
+
+        let operation = webView.printOperation(with: printInfo)
+        operation.showsPrintPanel = false
+        operation.showsProgressPanel = false
+        operation.view?.frame = NSRect(origin: .zero, size: printInfo.paperSize)
+
+        // Run modally for the off-screen window. Unlike `run()`, this variant
+        // does not spin a nested run loop, so it does not deadlock WebKit.
+        operation.runModal(
+            for: window,
+            delegate: self,
+            didRun: #selector(printOperationDidRun(_:success:contextInfo:)),
+            contextInfo: nil
+        )
+#else
+        let renderer = UIPrintPageRenderer()
+        renderer.addPrintFormatter(webView.viewPrintFormatter(), startingAtPageAt: 0)
+        // Full-page paper/printable area; page margins come from the `@page`
+        // rule so they repeat on every page.
+        renderer.setValue(Self.a4, forKey: "paperRect")
+        renderer.setValue(Self.a4, forKey: "printableRect")
+
+        let data = NSMutableData()
+        UIGraphicsBeginPDFContextToData(data, Self.a4, nil)
+        let pageCount = renderer.numberOfPages
+        for page in 0..<pageCount {
+            UIGraphicsBeginPDFPage()
+            renderer.drawPage(at: page, in: UIGraphicsGetPDFContextBounds())
+        }
+        UIGraphicsEndPDFContext()
+
+        guard data.length > 0, pageCount > 0 else {
+            finish(.failure(ExportError.pdfGenerationFailed))
+            return
+        }
+        finish(.success(data as Data))
+#endif
+    }
+
+#if os(macOS)
+    // The print system may invoke this delegate selector on a background thread,
+    // so it must be `nonisolated`; hop back to the main actor before touching the
+    // web view or delivering the result.
+    @objc nonisolated private func printOperationDidRun(
+        _ printOperation: NSPrintOperation,
+        success: Bool,
+        contextInfo: UnsafeMutableRawPointer?
+    ) {
+        Task { @MainActor [weak self] in
+            self?.handlePrintCompletion(success: success)
+        }
+    }
+
+    @MainActor
+    private func handlePrintCompletion(success: Bool) {
+        let outputURL = pdfOutputURL
+        pdfOutputURL = nil
+        defer { outputURL.map { try? FileManager.default.removeItem(at: $0) } }
+
+        guard success, let outputURL, let data = try? Data(contentsOf: outputURL), !data.isEmpty else {
+            finish(.failure(ExportError.pdfGenerationFailed))
+            return
+        }
+        finish(.success(data))
+    }
+#endif
+}
+
+extension MarkdownPDFExporter: WKNavigationDelegate {
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        // Add the `pdf` body class (opaque white background) and render.
+        let literal = MarkdownWeb.jsStringLiteral(markdown)
+        webView.evaluateJavaScript(
+            "document.body.classList.add('pdf'); window.__daNotesRender(\(literal));",
+            completionHandler: nil
+        )
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        finish(.failure(error))
+    }
+
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        finish(.failure(error))
+    }
+}
+
+extension MarkdownPDFExporter: WKScriptMessageHandler {
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard message.name == "rendered" else { return }
+        // The `rendered` message fires once Markdown + MathJax are typeset. Wait
+        // for any image attachments to decode, then capture on the next runloop
+        // so the final layout is flushed before printing.
+        let waitForImages = """
+        (async () => {
+          const images = Array.from(document.images);
+          await Promise.all(images.map(img => img.complete
+            ? null
+            : new Promise(resolve => { img.onload = img.onerror = resolve; })));
+          return true;
+        })()
+        """
+        webView.evaluateJavaScript(waitForImages) { [weak self] _, _ in
+            DispatchQueue.main.async {
+                self?.generatePDF()
+            }
+        }
+    }
+}
