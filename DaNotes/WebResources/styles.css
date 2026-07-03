@@ -32,6 +32,7 @@ h2 {
 
 em {
   background: rgba(255, 255, 0, 0.5);
+  background-blend-mode: multiply;
 }
 
 img {
@@ -53,9 +54,15 @@ th {
   background-color: -apple-system-grouped-background;
 }
 
+hr {
+  border: none;
+  border-top: 0.1rem solid -apple-system-separator;
+}
+
 body.pdf {
   background: #ffffff;
   padding: 0;
+  font-size: 1rem;
 }
 
 @page {

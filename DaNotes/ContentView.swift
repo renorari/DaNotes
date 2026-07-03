@@ -30,9 +30,7 @@ struct ContentView: View {
         NavigationStack {
             HStack {
                 if showEditor {
-                    TextEditor(text: $text)
-                        .font(.system(size: 20))
-                        .textEditorStyle(.plain)
+                    PlainTextEditor(text: $text)
                 }
                 
                 if showEditor && showView {
