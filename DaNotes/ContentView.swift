@@ -19,6 +19,9 @@ struct ContentView: View {
     @State private var showClearConfirmation: Bool = false
     @State private var showImagePicker: Bool = false
     @State private var showHandwriting: Bool = false
+#if os(iOS)
+    @State private var showTablePicker: Bool = false
+#endif
     @AppStorage("SuppressClearConfirmation") private var suppressClearConfirmation: Bool = false
 #if os(iOS)
     @State private var shareItem: ShareItem?
@@ -161,6 +164,16 @@ struct ContentView: View {
                 HandwritingSheet { pngData in
                     insertPNGImage(pngData)
                 }
+            }
+            .sheet(isPresented: $showTablePicker) {
+                TableGridPicker { rows, columns in
+                    editorController.insertTable(rows: rows, columns: columns)
+                    showTablePicker = false
+                }
+                .presentationSizing(.fitted)
+            }
+            .onAppear {
+                editorController.requestTablePicker = { showTablePicker = true }
             }
 #endif
         }
