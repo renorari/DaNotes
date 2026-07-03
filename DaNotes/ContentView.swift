@@ -25,12 +25,13 @@ struct ContentView: View {
 #endif
     @State private var exportErrorMessage: String?
     @State private var imageImportErrorMessage: String?
+    @State private var editorController = PlainTextEditorController()
     
     var body: some View {
         NavigationStack {
             HStack {
                 if showEditor {
-                    PlainTextEditor(text: $text)
+                    PlainTextEditor(text: $text, controller: editorController)
                 }
                 
                 if showEditor && showView {
@@ -240,6 +241,11 @@ private extension ContentView {
 
     func insertImageMarkdown(relativePath: String) {
         let imageMarkdown = "![image](\(relativePath))"
+
+        // Insert at the caret when the editor is available; otherwise append.
+        if editorController.insertBlock(imageMarkdown) {
+            return
+        }
 
         if text.isEmpty {
             text = imageMarkdown
