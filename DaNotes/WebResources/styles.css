@@ -35,23 +35,43 @@ em {
   background-blend-mode: multiply;
 }
 
+@media (prefers-color-scheme: dark) {
+  em {
+    background: rgba(255, 255, 0, 0.25);
+  }
+}
+
 img {
   max-width: 100%;
   height: auto;
 }
 
 table {
-  border-collapse: collapse;
   width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background-color: -apple-system-secondary-background;
+  border-right: 0.1rem solid -apple-system-separator;
+  border-bottom: 0.1rem solid -apple-system-separator;
 }
 
 th,
 td {
-  border: 0.1rem solid -apple-system-separator;
+  padding: 0.5rem;
+  border-style: solid;
+  border-color: -apple-system-separator;
+  border-width: 0.1rem 0 0 0.1rem;
+  text-align: left;
+  vertical-align: top;
 }
 
 th {
-  background-color: -apple-system-grouped-background;
+  color: -apple-system-label;
+  background-color: -apple-system-tertiary-background;
+}
+
+td {
+  word-break: break-word;
 }
 
 hr {
