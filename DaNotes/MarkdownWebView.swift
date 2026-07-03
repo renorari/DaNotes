@@ -173,6 +173,10 @@ struct MarkdownWebView {
         private var isLoaded = false
         private var pendingMarkdown: String?
         private var lastRendered: String?
+        /// Root `font-size` in px driving the `rem`-based stylesheet. Scaled with
+        /// Dynamic Type so the preview matches the editor's body font.
+        private var rootFontSizePx: CGFloat = 16
+        private var appliedRootFontSizePx: CGFloat?
 
         init(attachmentsURL: URL) {
             let configuration = MarkdownWebConfiguration.make(attachmentsURL: attachmentsURL)
@@ -199,6 +203,14 @@ struct MarkdownWebView {
             renderPending()
         }
 
+        /// Sets the root font size (px) so the whole preview scales with Dynamic
+        /// Type. `px` is the editor's 16pt base run through `UIFontMetrics`.
+        func update(rootFontSizePx px: CGFloat) {
+            rootFontSizePx = px
+            guard isLoaded else { return }
+            applyRootFontSize()
+        }
+
         private func renderPending() {
             guard let markdown = pendingMarkdown, markdown != lastRendered else { return }
             lastRendered = markdown
@@ -206,8 +218,18 @@ struct MarkdownWebView {
             webView.evaluateJavaScript("window.__daNotesRender(\(literal));", completionHandler: nil)
         }
 
+        private func applyRootFontSize() {
+            guard appliedRootFontSizePx != rootFontSizePx else { return }
+            appliedRootFontSizePx = rootFontSizePx
+            webView.evaluateJavaScript(
+                "document.documentElement.style.fontSize = '\(rootFontSizePx)px';",
+                completionHandler: nil
+            )
+        }
+
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             isLoaded = true
+            applyRootFontSize()
             renderPending()
         }
     }
@@ -231,6 +253,11 @@ extension MarkdownWebView: UIViewRepresentable {
 
     func updateUIView(_ uiView: WKWebView, context: Context) {
         context.coordinator.update(markdown: markdown)
+        // Scale the 16px CSS root with Dynamic Type (matching the editor, which
+        // scales its 20pt base the same way). SwiftUI re-runs this when the
+        // user's text size changes, so the preview updates live.
+        let rootPx = UIFontMetrics.default.scaledValue(for: 16, compatibleWith: uiView.traitCollection)
+        context.coordinator.update(rootFontSizePx: rootPx)
     }
 }
 #endif

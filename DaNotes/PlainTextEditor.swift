@@ -132,7 +132,9 @@ struct PlainTextEditor: UIViewRepresentable {
         let textView = UITextView()
         controller?.textView = textView
         textView.delegate = context.coordinator
-        textView.font = .systemFont(ofSize: fontSize)
+        // Scale the body font with Dynamic Type, using `fontSize` as the base.
+        textView.font = Self.scaledFont(fontSize)
+        textView.adjustsFontForContentSizeCategory = true
         textView.backgroundColor = .clear
 
         // Disable the smart substitutions.
@@ -216,9 +218,17 @@ struct PlainTextEditor: UIViewRepresentable {
         if uiView.text != text {
             uiView.text = text
         }
-        if uiView.font?.pointSize != fontSize {
-            uiView.font = .systemFont(ofSize: fontSize)
+        // Re-apply only when the base size actually changes; Dynamic Type
+        // rescaling is handled automatically by the text view itself.
+        let desiredFont = Self.scaledFont(fontSize)
+        if uiView.font != desiredFont {
+            uiView.font = desiredFont
         }
+    }
+
+    /// The body font scaled for the current Dynamic Type size, based on `fontSize`.
+    private static func scaledFont(_ size: CGFloat) -> UIFont {
+        UIFontMetrics.default.scaledFont(for: .systemFont(ofSize: size))
     }
 
     final class Coordinator: NSObject, UITextViewDelegate {
@@ -261,8 +271,10 @@ final class PlainTextEditorController {
         guard let textView else { return }
         if !textView.isFirstResponder { textView.becomeFirstResponder() }
 
+        // Inherit the editor's own font/colour so inserted text matches; these
+        // are set in `makeUIView`, so no hard-coded fallback size is needed.
         var attributes = textView.typingAttributes
-        attributes[.font] = attributes[.font] ?? textView.font ?? UIFont.systemFont(ofSize: 20)
+        attributes[.font] = attributes[.font] ?? textView.font
         attributes[.foregroundColor] = attributes[.foregroundColor] ?? textView.textColor ?? UIColor.label
         let attributed = NSAttributedString(string: replacement, attributes: attributes)
 
