@@ -18,6 +18,7 @@ struct ContentView: View {
     @State private var showView: Bool = true
     @State private var showClearConfirmation: Bool = false
     @State private var showImagePicker: Bool = false
+    @State private var showHandwriting: Bool = false
     @AppStorage("SuppressClearConfirmation") private var suppressClearConfirmation: Bool = false
 #if os(iOS)
     @State private var shareItem: ShareItem?
@@ -66,6 +67,11 @@ struct ContentView: View {
                     Button(.addImage, systemImage: "photo.badge.plus") {
                         showImagePicker = true
                     }
+#if os(iOS)
+                    Button(.handwriting, systemImage: "pencil.and.scribble") {
+                        showHandwriting = true
+                    }
+#endif
                 }
                 ToolbarSpacer()
                 ToolbarItemGroup {
@@ -150,6 +156,13 @@ struct ContentView: View {
             } message: {
                 Text(exportErrorMessage ?? "")
             }
+#if os(iOS)
+            .sheet(isPresented: $showHandwriting) {
+                HandwritingSheet { pngData in
+                    insertPNGImage(pngData)
+                }
+            }
+#endif
         }
     }
 }
@@ -253,6 +266,15 @@ private extension ContentView {
             text += imageMarkdown
         } else {
             text += "\n\n\(imageMarkdown)"
+        }
+    }
+
+    func insertPNGImage(_ data: Data) {
+        do {
+            let storedURL = try ImageAttachmentStore.shared.storeImageData(data, fileExtension: "png")
+            insertImageMarkdown(relativePath: storedURL.lastPathComponent)
+        } catch {
+            handleImageImportError(error)
         }
     }
 

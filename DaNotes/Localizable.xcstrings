@@ -35,6 +35,23 @@
         }
       }
     },
+    "cancel" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancel"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "キャンセル"
+          }
+        }
+      }
+    },
     "clearButton" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -69,19 +86,19 @@
         }
       }
     },
-    "exportMD" : {
+    "exportEmpty" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Export to Markdown file"
+            "value" : "There is nothing to export."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Markdownとして保存"
+            "value" : "書き出す内容がありません。"
           }
         }
       }
@@ -103,19 +120,19 @@
         }
       }
     },
-    "exportEmpty" : {
+    "exportMD" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "There is nothing to export."
+            "value" : "Export to Markdown file"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "書き出す内容がありません。"
+            "value" : "Markdownとして保存"
           }
         }
       }
@@ -154,6 +171,23 @@
         }
       }
     },
+    "handwriting" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Handwriting"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "手書き"
+          }
+        }
+      }
+    },
     "importImageError" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -167,6 +201,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "画像の読み込みに失敗しました"
+          }
+        }
+      }
+    },
+    "insertButton" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Insert"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "挿入"
           }
         }
       }
