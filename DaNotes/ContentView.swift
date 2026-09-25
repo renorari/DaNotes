@@ -23,6 +23,7 @@ struct ContentView: View {
     @State private var showHandwriting: Bool = false
 #if os(iOS)
     @State private var showTablePicker: Bool = false
+    @State private var markupTarget: MarkupTarget?
 #endif
     @AppStorage("SuppressClearConfirmation") private var suppressClearConfirmation: Bool = false
 #if os(iOS)
@@ -32,6 +33,7 @@ struct ContentView: View {
     @State private var exportErrorMessage: String?
     @State private var imageImportErrorMessage: String?
     @State private var editorController = PlainTextEditorController()
+    @State private var markdownViewController = MarkdownWebViewController()
     
     var body: some View {
         NavigationStack {
@@ -45,7 +47,7 @@ struct ContentView: View {
                 }
                 
                 if showView {
-                    MarkdownWebView(markdown: text, attachmentsURL: ImageAttachmentStore.shared.baseURL)
+                    MarkdownWebView(markdown: text, attachmentsURL: ImageAttachmentStore.shared.baseURL, controller: markdownViewController)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
@@ -178,8 +180,16 @@ struct ContentView: View {
                 }
                 .presentationSizing(.fitted)
             }
+            .sheet(item: $markupTarget) { target in
+                HandwritingSheet(backgroundImage: target.image) { data in
+                    saveMarkup(data, fileName: target.fileName)
+                }
+            }
             .onAppear {
                 editorController.requestTablePicker = { showTablePicker = true }
+                markdownViewController.onImageTapped = { fileName in
+                    presentMarkup(for: fileName)
+                }
             }
 #endif
             .onAppear {
@@ -384,6 +394,28 @@ private extension ContentView {
             handleImageImportError(error)
         }
     }
+
+    /// Loads the tapped attachment from disk and presents it for markup.
+    @MainActor
+    func presentMarkup(for fileName: String) {
+        let fileURL = ImageAttachmentStore.shared.baseURL.appendingPathComponent(fileName)
+        guard let data = try? Data(contentsOf: fileURL), let image = UIImage(data: data) else { return }
+        markupTarget = MarkupTarget(fileName: fileName, image: image)
+    }
+
+    /// Overwrites the original attachment with the annotated version, then
+    /// tells the preview to refetch it (it would otherwise keep showing the
+    /// bytes it already decoded for that unchanged URL).
+    @MainActor
+    func saveMarkup(_ data: Data, fileName: String) {
+        let fileURL = ImageAttachmentStore.shared.baseURL.appendingPathComponent(fileName)
+        do {
+            try data.write(to: fileURL, options: .atomic)
+            markdownViewController.refreshAttachments()
+        } catch {
+            handleImageImportError(error)
+        }
+    }
 #endif
 
     func clearAllContent() {
@@ -473,6 +505,14 @@ private struct ImageAttachmentStore {
 private struct ShareItem: Identifiable {
     let id = UUID()
     let url: URL
+}
+
+/// An attachment image the user tapped in the preview, on its way to the
+/// markup sheet.
+private struct MarkupTarget: Identifiable {
+    let fileName: String
+    let image: UIImage
+    var id: String { fileName }
 }
 
 private struct ShareSheet: UIViewControllerRepresentable {

@@ -44,6 +44,18 @@
     marked.use(mathExtension);
   }
 
+  // Lets the native layer offer markup on an existing image: delegated on
+  // `document` so it keeps working after `content.innerHTML` is replaced on
+  // every render.
+  document.addEventListener('click', function (event) {
+    var target = event.target;
+    if (!target || target.tagName !== 'IMG' || !target.closest('#content')) { return; }
+    if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.imageTapped) {
+      var src = target.getAttribute('src');
+      if (src) { window.webkit.messageHandlers.imageTapped.postMessage(src); }
+    }
+  });
+
   window.__daNotesRender = async function (md) {
     var content = document.getElementById('content');
     try {

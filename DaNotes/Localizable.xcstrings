@@ -256,6 +256,23 @@
         }
       }
     },
+    "markup" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Markup"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "マークアップ"
+          }
+        }
+      }
+    },
     "mdBold" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -490,6 +507,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "テーブル"
+          }
+        }
+      }
+    },
+    "saveButton" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存"
           }
         }
       }

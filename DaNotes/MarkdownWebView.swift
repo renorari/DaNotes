@@ -162,16 +162,39 @@ enum MarkdownWebConfiguration {
 
 // MARK: - SwiftUI preview view
 
+/// Lets the host imperatively drive the live preview: react to an image the
+/// user tapped, and force attachments to be refetched after one is
+/// overwritten in place (e.g. by markup), since the page would otherwise keep
+/// serving the old bytes it already decoded for that URL.
+@MainActor
+final class MarkdownWebViewController {
+    fileprivate weak var coordinator: MarkdownWebView.Coordinator?
+
+    /// Invoked with an attachment's file name when the user taps its image in
+    /// the preview.
+    var onImageTapped: ((String) -> Void)?
+
+    func refreshAttachments() {
+        coordinator?.refreshAttachments()
+    }
+}
+
 struct MarkdownWebView {
     let markdown: String
     let attachmentsURL: URL
+    var controller: MarkdownWebViewController? = nil
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(attachmentsURL: attachmentsURL)
+        let coordinator = Coordinator(attachmentsURL: attachmentsURL)
+        controller?.coordinator = coordinator
+        coordinator.onImageTapped = { [weak controller] fileName in
+            controller?.onImageTapped?(fileName)
+        }
+        return coordinator
     }
 
     @MainActor
-    final class Coordinator: NSObject, WKNavigationDelegate {
+    final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
         let webView: WKWebView
         private var isLoaded = false
         private var pendingMarkdown: String?
@@ -180,12 +203,14 @@ struct MarkdownWebView {
         /// Dynamic Type so the preview matches the editor's body font.
         private var rootFontSizePx: CGFloat = 16
         private var appliedRootFontSizePx: CGFloat?
+        var onImageTapped: ((String) -> Void)?
 
         init(attachmentsURL: URL) {
             let configuration = MarkdownWebConfiguration.make(attachmentsURL: attachmentsURL)
             webView = WKWebView(frame: .zero, configuration: configuration)
             super.init()
             webView.navigationDelegate = self
+            configuration.userContentController.add(self, name: "imageTapped")
             // Let the SwiftUI background show through so the rendered content
             // blends with the window instead of using WebKit's own (slightly
             // different) system background, which is visible in dark mode.
@@ -214,11 +239,36 @@ struct MarkdownWebView {
             applyRootFontSize()
         }
 
+        /// Forces the next render to refetch every attachment image from disk.
+        /// Needed after an existing attachment file is overwritten in place:
+        /// the page would otherwise keep showing the bytes it already decoded
+        /// for that (unchanged) URL, so a full reload is required to drop them.
+        func refreshAttachments() {
+            lastRendered = nil
+            webView.reload()
+        }
+
         private func renderPending() {
             guard let markdown = pendingMarkdown, markdown != lastRendered else { return }
+            let previous = lastRendered
             lastRendered = markdown
+            // Follow the user down the page: if they just typed more text at
+            // the end of the note, scroll the preview to the bottom once the
+            // re-render lands.
+            let shouldScrollToBottom = Self.appendedAtEnd(from: previous, to: markdown)
             let literal = MarkdownWeb.jsStringLiteral(markdown)
-            webView.evaluateJavaScript("window.__daNotesRender(\(literal));", completionHandler: nil)
+            webView.evaluateJavaScript("window.__daNotesRender(\(literal));") { [weak self] _, _ in
+                guard shouldScrollToBottom else { return }
+                self?.webView.evaluateJavaScript("window.scrollTo(0, document.body.scrollHeight);", completionHandler: nil)
+            }
+        }
+
+        /// Whether `current` is `previous` with text appended at the very
+        /// end — i.e. the user was typing at the end of the note, rather than
+        /// editing earlier in the text.
+        private static func appendedAtEnd(from previous: String?, to current: String) -> Bool {
+            guard let previous, current.count > previous.count else { return false }
+            return current.hasPrefix(previous)
         }
 
         private func applyRootFontSize() {
@@ -234,6 +284,11 @@ struct MarkdownWebView {
             isLoaded = true
             applyRootFontSize()
             renderPending()
+        }
+
+        func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+            guard message.name == "imageTapped", let fileName = message.body as? String else { return }
+            onImageTapped?(fileName)
         }
     }
 }
