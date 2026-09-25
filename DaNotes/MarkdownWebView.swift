@@ -40,6 +40,7 @@ enum MarkdownWeb {
 enum ExportError: LocalizedError {
     case emptyContent
     case pdfGenerationFailed
+    case imageGenerationFailed
 
     var errorDescription: String? {
         switch self {
@@ -47,6 +48,8 @@ enum ExportError: LocalizedError {
             return String(localized: "exportEmpty")
         case .pdfGenerationFailed:
             return String(localized: "exportPDFFailed")
+        case .imageGenerationFailed:
+            return String(localized: "copyImageFailed")
         }
     }
 }
@@ -464,6 +467,166 @@ extension MarkdownPDFExporter: WKScriptMessageHandler {
         webView.evaluateJavaScript(waitForImages) { [weak self] _, _ in
             DispatchQueue.main.async {
                 self?.generatePDF()
+            }
+        }
+    }
+}
+
+// MARK: - Image export
+
+/// Renders Markdown into a PNG sized to fit its content exactly, using an
+/// off-screen `WKWebView`.
+///
+/// Unlike ``MarkdownPDFExporter``, this does not use a fixed page size: the
+/// content is laid out at a fixed width and then the image height is trimmed
+/// to whatever that content actually needs, so the result has no paper-sized
+/// margins or blank space. Intended for copying the rendered note to the
+/// clipboard as a single image.
+@MainActor
+final class MarkdownImageExporter: NSObject {
+    /// Width the content is laid out at before its natural height is measured.
+    private static let contentWidth: CGFloat = 800
+
+    private let webView: WKWebView
+    private let markdown: String
+    private var completion: (@MainActor (Result<Data, Error>) -> Void)?
+
+    /// Keeps the exporter alive while the asynchronous render is in flight.
+    private static var liveExporters = Set<MarkdownImageExporter>()
+
+#if os(macOS)
+    /// Off-screen host window, mirroring `MarkdownPDFExporter`'s setup so
+    /// WebKit lays out and paints the content even though nothing is visible.
+    private var hostWindow: NSWindow?
+#endif
+
+    init(markdown: String, attachmentsURL: URL) {
+        self.markdown = markdown
+        let configuration = MarkdownWebConfiguration.make(attachmentsURL: attachmentsURL)
+        let initialFrame = CGRect(x: 0, y: 0, width: Self.contentWidth, height: 1)
+        webView = WKWebView(frame: initialFrame, configuration: configuration)
+        super.init()
+        configuration.userContentController.add(self, name: "rendered")
+        webView.navigationDelegate = self
+#if os(macOS)
+        let window = NSWindow(
+            contentRect: initialFrame,
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        window.isReleasedWhenClosed = false
+        window.contentView = webView
+        window.setFrameOrigin(NSPoint(x: -20000, y: -20000))
+        hostWindow = window
+#endif
+    }
+
+    /// Renders the Markdown and delivers the resulting PNG data on the main actor.
+    func export(completion: @escaping @MainActor (Result<Data, Error>) -> Void) {
+        self.completion = completion
+        Self.liveExporters.insert(self)
+        webView.load(URLRequest(url: MarkdownWeb.documentURL))
+    }
+
+    private func finish(_ result: Result<Data, Error>) {
+        guard completion != nil else { return }
+        webView.navigationDelegate = nil
+        webView.configuration.userContentController.removeAllScriptMessageHandlers()
+        webView.stopLoading()
+#if os(macOS)
+        hostWindow?.contentView = nil
+        hostWindow = nil
+#endif
+        completion?(result)
+        completion = nil
+        Self.liveExporters.remove(self)
+    }
+
+    /// Measures the rendered content's natural height, resizes the web view to
+    /// fit it exactly, then captures a PNG snapshot.
+    private func measureAndCapture() {
+        webView.evaluateJavaScript(
+            "Math.ceil(Math.max(document.body.scrollHeight, document.documentElement.scrollHeight))"
+        ) { [weak self] result, _ in
+            guard let self else { return }
+            let height = (result as? NSNumber)?.doubleValue ?? 1
+            let size = CGSize(width: Self.contentWidth, height: max(CGFloat(height), 1))
+            self.webView.frame = CGRect(origin: .zero, size: size)
+#if os(macOS)
+            self.hostWindow?.setContentSize(size)
+#endif
+            // Give the resize a runloop turn to settle before snapshotting.
+            DispatchQueue.main.async {
+                self.captureSnapshot(size: size)
+            }
+        }
+    }
+
+    private func captureSnapshot(size: CGSize) {
+        let configuration = WKSnapshotConfiguration()
+        configuration.rect = CGRect(origin: .zero, size: size)
+        webView.takeSnapshot(with: configuration) { [weak self] image, error in
+            guard let self else { return }
+            guard let image else {
+                self.finish(.failure(error ?? ExportError.imageGenerationFailed))
+                return
+            }
+#if os(macOS)
+            guard let tiff = image.tiffRepresentation,
+                  let bitmap = NSBitmapImageRep(data: tiff),
+                  let data = bitmap.representation(using: .png, properties: [:]) else {
+                self.finish(.failure(ExportError.imageGenerationFailed))
+                return
+            }
+            self.finish(.success(data))
+#else
+            guard let data = image.pngData() else {
+                self.finish(.failure(ExportError.imageGenerationFailed))
+                return
+            }
+            self.finish(.success(data))
+#endif
+        }
+    }
+}
+
+extension MarkdownImageExporter: WKNavigationDelegate {
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        // Add the `pdf` body class (opaque white background) and render.
+        let literal = MarkdownWeb.jsStringLiteral(markdown)
+        webView.evaluateJavaScript(
+            "document.body.classList.add('pdf'); window.__daNotesRender(\(literal));",
+            completionHandler: nil
+        )
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        finish(.failure(error))
+    }
+
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        finish(.failure(error))
+    }
+}
+
+extension MarkdownImageExporter: WKScriptMessageHandler {
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard message.name == "rendered" else { return }
+        // The `rendered` message fires once Markdown + MathJax are typeset. Wait
+        // for any image attachments to decode before measuring the content.
+        let waitForImages = """
+        (async () => {
+          const images = Array.from(document.images);
+          await Promise.all(images.map(img => img.complete
+            ? null
+            : new Promise(resolve => { img.onload = img.onerror = resolve; })));
+          return true;
+        })()
+        """
+        webView.evaluateJavaScript(waitForImages) { [weak self] _, _ in
+            DispatchQueue.main.async {
+                self?.measureAndCapture()
             }
         }
     }

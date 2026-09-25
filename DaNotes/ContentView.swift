@@ -10,6 +10,8 @@ import UniformTypeIdentifiers
 #if os(iOS)
 import PhotosUI
 import UIKit
+#elseif os(macOS)
+import AppKit
 #endif
 
 struct ContentView: View {
@@ -63,6 +65,10 @@ struct ContentView: View {
                         exportPDF()
                     }
                     .keyboardShortcut("s", modifiers: [.command, .shift])
+                    .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    Button(.copyImage, systemImage: "photo.on.rectangle") {
+                        copyImage()
+                    }
                     .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
                 ToolbarSpacer()
@@ -235,6 +241,47 @@ private extension ContentView {
                 handleExportError(error)
             }
         }
+    }
+
+    @MainActor
+    func copyImage() {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            handleExportError(ExportError.emptyContent)
+            return
+        }
+
+        let exporter = MarkdownImageExporter(
+            markdown: text,
+            attachmentsURL: ImageAttachmentStore.shared.baseURL
+        )
+        exporter.export { result in
+            switch result {
+            case .success(let data):
+                copyImageDataToPasteboard(data)
+            case .failure(let error):
+                handleExportError(error)
+            }
+        }
+    }
+
+    @MainActor
+    func copyImageDataToPasteboard(_ data: Data) {
+#if os(macOS)
+        guard let image = NSImage(data: data) else {
+            handleExportError(ExportError.imageGenerationFailed)
+            return
+        }
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.writeObjects([image])
+#else
+        guard let image = UIImage(data: data) else {
+            handleExportError(ExportError.imageGenerationFailed)
+            return
+        }
+        UIPasteboard.general.image = image
+#endif
     }
 
 #if os(macOS)
