@@ -9,9 +9,51 @@
 //
 
 import SwiftUI
+import UniformTypeIdentifiers
 
 #if os(macOS)
 import AppKit
+
+/// Image types recognised when pasting, tried in preference order so the
+/// original format (rather than a lossy re-encode) is kept where possible.
+private let pasteboardImageTypes: [(UTType, String)] = [(.png, "png"), (.jpeg, "jpg"), (.gif, "gif"), (.tiff, "tiff"), (.heic, "heic")]
+
+/// An `NSTextView` that also accepts pasted images, forwarding their raw data
+/// to `onImagePaste` instead of the (unsupported, for a plain-text view)
+/// default behaviour of doing nothing.
+final class PastableTextView: NSTextView {
+    var onImagePaste: ((Data, String) -> Void)?
+
+    override func paste(_ sender: Any?) {
+        if let (data, fileExtension) = Self.imageData(from: .general) {
+            onImagePaste?(data, fileExtension)
+            return
+        }
+        super.paste(sender)
+    }
+
+    override func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        if menuItem.action == #selector(paste(_:)), Self.imageData(from: .general) != nil {
+            return true
+        }
+        return super.validateMenuItem(menuItem)
+    }
+
+    private static func imageData(from pasteboard: NSPasteboard) -> (Data, String)? {
+        for (type, fileExtension) in pasteboardImageTypes {
+            if let data = pasteboard.data(forType: NSPasteboard.PasteboardType(type.identifier)) {
+                return (data, fileExtension)
+            }
+        }
+        if let image = NSImage(pasteboard: pasteboard),
+           let tiff = image.tiffRepresentation,
+           let bitmap = NSBitmapImageRep(data: tiff),
+           let data = bitmap.representation(using: .png, properties: [:]) {
+            return (data, "png")
+        }
+        return nil
+    }
+}
 
 struct PlainTextEditor: NSViewRepresentable {
     @Binding var text: String
@@ -21,13 +63,18 @@ struct PlainTextEditor: NSViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
     func makeNSView(context: Context) -> NSScrollView {
-        let scrollView = NSTextView.scrollableTextView()
+        let scrollView = NSScrollView()
         scrollView.drawsBackground = false
         scrollView.hasVerticalScroller = true
 
-        guard let textView = scrollView.documentView as? NSTextView else {
-            return scrollView
-        }
+        // `NSTextView`'s frame-based initializer sets up its own text storage,
+        // layout manager and text container automatically.
+        let textView = PastableTextView()
+        textView.isVerticallyResizable = true
+        textView.isHorizontallyResizable = false
+        textView.autoresizingMask = [.width]
+        textView.textContainer?.widthTracksTextView = true
+        textView.textContainer?.containerSize = NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude)
 
         controller?.textView = textView
         textView.delegate = context.coordinator
@@ -43,6 +90,11 @@ struct PlainTextEditor: NSViewRepresentable {
         textView.isAutomaticSpellingCorrectionEnabled = false
 
         textView.string = text
+        textView.onImagePaste = { [weak controller] data, fileExtension in
+            controller?.onImagePaste?(data, fileExtension)
+        }
+
+        scrollView.documentView = textView
         return scrollView
     }
 
@@ -71,6 +123,11 @@ struct PlainTextEditor: NSViewRepresentable {
 /// current caret / selection instead of appending to the end.
 final class PlainTextEditorController {
     fileprivate weak var textView: NSTextView?
+
+    /// Invoked when an image is pasted into the editor, with its raw data and
+    /// a suitable file extension, so the host can store it as an attachment
+    /// and insert the corresponding Markdown at the caret.
+    var onImagePaste: ((Data, String) -> Void)?
 
     /// Inserts `block` at the caret as its own paragraph, adding surrounding
     /// blank lines only where needed. Returns `false` when no text view is
@@ -121,6 +178,45 @@ final class PlainTextEditorController {
 #if os(iOS)
 import UIKit
 
+/// Image types recognised when pasting, tried in preference order so the
+/// original format (rather than a lossy re-encode) is kept where possible.
+private let pasteboardImageTypes: [(UTType, String)] = [(.png, "png"), (.jpeg, "jpg"), (.gif, "gif"), (.tiff, "tiff"), (.heic, "heic")]
+
+/// A `UITextView` that also accepts pasted images, forwarding their raw data
+/// to `onImagePaste` instead of the (unsupported, for a plain-text view)
+/// default behaviour of doing nothing.
+final class PastableTextView: UITextView {
+    var onImagePaste: ((Data, String) -> Void)?
+
+    override func paste(_ sender: Any?) {
+        let pasteboard = UIPasteboard.general
+        if let (data, fileExtension) = Self.imageData(from: pasteboard) {
+            onImagePaste?(data, fileExtension)
+            return
+        }
+        super.paste(sender)
+    }
+
+    override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {
+        if action == #selector(paste(_:)), UIPasteboard.general.hasImages {
+            return true
+        }
+        return super.canPerformAction(action, withSender: sender)
+    }
+
+    private static func imageData(from pasteboard: UIPasteboard) -> (Data, String)? {
+        for (type, fileExtension) in pasteboardImageTypes {
+            if let data = pasteboard.data(forPasteboardType: type.identifier) {
+                return (data, fileExtension)
+            }
+        }
+        if let image = pasteboard.image, let data = image.pngData() {
+            return (data, "png")
+        }
+        return nil
+    }
+}
+
 struct PlainTextEditor: UIViewRepresentable {
     @Binding var text: String
     var fontSize: CGFloat = 20
@@ -129,7 +225,7 @@ struct PlainTextEditor: UIViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
     func makeUIView(context: Context) -> UITextView {
-        let textView = UITextView()
+        let textView = PastableTextView()
         controller?.textView = textView
         textView.delegate = context.coordinator
         // Scale the body font with Dynamic Type, using `fontSize` as the base.
@@ -141,6 +237,10 @@ struct PlainTextEditor: UIViewRepresentable {
         textView.smartDashesType = .no
         textView.smartQuotesType = .no
         textView.smartInsertDeleteType = .no
+
+        textView.onImagePaste = { [weak controller] data, fileExtension in
+            controller?.onImagePaste?(data, fileExtension)
+        }
 
         // Markdown snippet controls integrated into the keyboard's own shortcuts
         // bar (like GoodNotes). DaNotes is iPad-only, so the shortcuts bar is
@@ -250,6 +350,11 @@ final class PlainTextEditorController {
     /// Invoked when the toolbar's table button is tapped, so the host can
     /// present a row/column grid picker.
     var requestTablePicker: (() -> Void)?
+
+    /// Invoked when an image is pasted into the editor, with its raw data and
+    /// a suitable file extension, so the host can store it as an attachment
+    /// and insert the corresponding Markdown at the caret.
+    var onImagePaste: ((Data, String) -> Void)?
 
     // MARK: - Primitives
 

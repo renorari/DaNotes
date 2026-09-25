@@ -182,6 +182,11 @@ struct ContentView: View {
                 editorController.requestTablePicker = { showTablePicker = true }
             }
 #endif
+            .onAppear {
+                editorController.onImagePaste = { data, fileExtension in
+                    insertPastedImage(data, fileExtension: fileExtension)
+                }
+            }
         }
     }
 }
@@ -330,8 +335,14 @@ private extension ContentView {
     }
 
     func insertPNGImage(_ data: Data) {
+        insertPastedImage(data, fileExtension: "png")
+    }
+
+    /// Stores raw image data (e.g. pasted from the system clipboard) as an
+    /// attachment and inserts the corresponding Markdown at the caret.
+    func insertPastedImage(_ data: Data, fileExtension: String) {
         do {
-            let storedURL = try ImageAttachmentStore.shared.storeImageData(data, fileExtension: "png")
+            let storedURL = try ImageAttachmentStore.shared.storeImageData(data, fileExtension: fileExtension)
             insertImageMarkdown(relativePath: storedURL.lastPathComponent)
         } catch {
             handleImageImportError(error)
