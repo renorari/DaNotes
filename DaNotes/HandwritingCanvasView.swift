@@ -59,6 +59,9 @@ struct HandwritingSheet: View {
                     }
                 }
         }
+        // Once there's a drawing, a stray tap outside the sheet (or a swipe)
+        // must not discard it; only the explicit Cancel/Insert buttons close it.
+        .interactiveDismissDisabled(!controller.isEmpty)
     }
 }
 
