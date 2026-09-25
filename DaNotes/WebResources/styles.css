@@ -44,7 +44,10 @@ em {
 }
 
 img {
-  max-width: 100%;
+  /* Capped so a large screenshot or photo can't dominate the page — most
+     noticeable in the PDF export, where 100% width spans the full A4 page. */
+  max-width: min(100%, 400px);
+  max-height: 400px;
   height: auto;
 }
 
