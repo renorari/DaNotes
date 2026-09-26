@@ -56,6 +56,9 @@ struct ContentView: View {
             #else
             .padding(.horizontal)
             #endif
+            .onDrop(of: [.image], isTargeted: nil) { providers in
+                handleImageDrop(providers)
+            }
             .toolbar {
                 ToolbarItemGroup(placement: .navigation) {
                     Button(.exportMD, systemImage: "square.and.arrow.down") {
@@ -357,6 +360,33 @@ private extension ContentView {
         } catch {
             handleImageImportError(error)
         }
+    }
+
+    /// Handles images dragged into the window from Finder, Photos, Safari,
+    /// etc. Recognises common image types up front to keep their original
+    /// format; anything else that merely conforms to `.image` still gets
+    /// accepted and stored as PNG.
+    @MainActor
+    @discardableResult
+    func handleImageDrop(_ providers: [NSItemProvider]) -> Bool {
+        let orderedTypes: [(UTType, String)] = [(.png, "png"), (.jpeg, "jpg"), (.gif, "gif"), (.tiff, "tiff"), (.heic, "heic")]
+        var handledAny = false
+        for provider in providers {
+            let match = orderedTypes.first { provider.hasItemConformingToTypeIdentifier($0.0.identifier) }
+            guard let typeIdentifier = match?.0.identifier
+                ?? (provider.hasItemConformingToTypeIdentifier(UTType.image.identifier) ? UTType.image.identifier : nil) else {
+                continue
+            }
+            let fileExtension = match?.1 ?? "png"
+            handledAny = true
+            provider.loadDataRepresentation(forTypeIdentifier: typeIdentifier) { data, _ in
+                guard let data else { return }
+                Task { @MainActor in
+                    insertPastedImage(data, fileExtension: fileExtension)
+                }
+            }
+        }
+        return handledAny
     }
 
     func importImage(from url: URL) {

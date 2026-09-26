@@ -39,11 +39,31 @@ final class PastableTextView: NSTextView {
         return super.validateMenuItem(menuItem)
     }
 
+    // Dragging an image (including a not-yet-saved screenshot thumbnail)
+    // provides a file URL, not image bytes; `NSTextView`'s default drop
+    // handling doesn't know what to do with that for a plain-text view, so
+    // it falls back to inserting the file's path as text. Intercept first.
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        if let (data, fileExtension) = Self.imageData(from: sender.draggingPasteboard) {
+            onImagePaste?(data, fileExtension)
+            return true
+        }
+        return super.performDragOperation(sender)
+    }
+
     private static func imageData(from pasteboard: NSPasteboard) -> (Data, String)? {
         for (type, fileExtension) in pasteboardImageTypes {
             if let data = pasteboard.data(forType: NSPasteboard.PasteboardType(type.identifier)) {
                 return (data, fileExtension)
             }
+        }
+        if let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL],
+           let fileURL = urls.first(where: { url in
+               guard let type = UTType(filenameExtension: url.pathExtension) else { return false }
+               return type.conforms(to: .image)
+           }),
+           let data = try? Data(contentsOf: fileURL) {
+            return (data, fileURL.pathExtension.lowercased())
         }
         if let image = NSImage(pasteboard: pasteboard),
            let tiff = image.tiffRepresentation,

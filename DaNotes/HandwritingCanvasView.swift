@@ -76,6 +76,10 @@ struct HandwritingSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(.cancel) { dismiss() }
+                        // Explicit, since the canvas holding first responder
+                        // otherwise swallows a plain Escape/Return before it
+                        // reaches the toolbar's automatic shortcut handling.
+                        .keyboardShortcut(.cancelAction)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(backgroundImage == nil ? .insertButton : .saveButton) {
@@ -85,6 +89,7 @@ struct HandwritingSheet: View {
                         dismiss()
                     }
                     .disabled(controller.isEmpty)
+                    .keyboardShortcut(.defaultAction)
                 }
             }
         }
