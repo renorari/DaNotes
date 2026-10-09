@@ -132,6 +132,16 @@ enum RevisionStore {
         SpotlightIndexer.index(note)
     }
 
+    /// Spins an earlier revision's text off into a brand-new, independent
+    /// note — unlike `restore`, this leaves `note` and its history untouched.
+    @discardableResult
+    static func duplicate(_ revision: NoteRevision, context: ModelContext) -> Note {
+        let newNote = Note(text: revision.text)
+        context.insert(newNote)
+        commit(note: newNote, context: context, kind: .initial)
+        return newNote
+    }
+
     private static func applyMerge(text: String, parents: [NoteRevision], note: Note, context: ModelContext) {
         note.text = text
         note.modifiedAt = Date()

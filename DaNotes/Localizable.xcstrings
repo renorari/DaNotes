@@ -866,6 +866,23 @@
         }
       }
     },
+    "duplicateThisVersion" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duplicate as New Note"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この版を複製"
+          }
+        }
+      }
+    },
     "restoreThisVersion" : {
       "extractionState" : "manual",
       "localizations" : {

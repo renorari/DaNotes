@@ -42,7 +42,10 @@ struct HistoryView: View {
                 }
             }
             .sheet(item: $selectedRevision) { revision in
-                RevisionDetailView(note: note, revision: revision, onRestore: { dismiss() })
+                RevisionDetailView(note: note, revision: revision, onRestore: { dismiss() }, onDuplicate: { newNote in
+                    NavigationCoordinator.shared.pendingNoteID = newNote.id
+                    dismiss()
+                })
             }
         }
 #if os(macOS)
@@ -121,6 +124,7 @@ private struct RevisionDetailView: View {
     @Bindable var note: Note
     let revision: NoteRevision
     var onRestore: () -> Void
+    var onDuplicate: (Note) -> Void
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
@@ -129,6 +133,7 @@ private struct RevisionDetailView: View {
             ScrollView {
                 Text(revision.text)
                     .font(.body.monospaced())
+                    .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding()
             }
@@ -139,6 +144,12 @@ private struct RevisionDetailView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(.close) { dismiss() }
+                }
+                ToolbarItem {
+                    Button(.duplicateThisVersion, systemImage: "doc.on.doc") {
+                        let newNote = RevisionStore.duplicate(revision, context: modelContext)
+                        onDuplicate(newNote)
+                    }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(.restoreThisVersion) {
