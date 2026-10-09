@@ -33,6 +33,14 @@ struct HistoryView: View {
                         }
                         .buttonStyle(.plain)
                     }
+                    // A list has no natural size to negotiate a sheet size
+                    // from (unlike the compact, self-sizing empty state
+                    // above), so it needs an explicit one — scoped to just
+                    // the list rather than the whole view, so the empty
+                    // state stays its own natural, compact size.
+                    #if os(macOS)
+                    .frame(minWidth: 420, idealWidth: 480, minHeight: 420, idealHeight: 560)
+                    #endif
                 }
             }
             .navigationTitle(Text(.historyTitle))
@@ -48,19 +56,6 @@ struct HistoryView: View {
                 })
             }
         }
-#if os(macOS)
-        // Without an explicit size, macOS sometimes fails to negotiate a
-        // reasonable sheet size for a NavigationStack whose content switches
-        // between the tiny empty state and a full list, leaving the sheet
-        // collapsed and blank. Size the empty state modestly instead of
-        // reusing the list's taller frame, which left a large dead gap above
-        // the "no history" message.
-        .frame(
-            minWidth: 420, idealWidth: 480,
-            minHeight: revisions.isEmpty ? 220 : 420,
-            idealHeight: revisions.isEmpty ? 260 : 560
-        )
-#endif
     }
 
     private func row(for revision: NoteRevision) -> some View {
