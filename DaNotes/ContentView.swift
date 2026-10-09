@@ -120,6 +120,9 @@ struct ContentView: View {
                         showHandwriting = true
                     }
 #endif
+                }
+                ToolbarSpacer()
+                ToolbarItemGroup {
                     Button(.noteHistory, systemImage: "clock.arrow.circlepath") {
                         showHistory = true
                     }
