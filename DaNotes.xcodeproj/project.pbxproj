@@ -11,9 +11,20 @@
 		B747D0802F9AEDEB0043003A /* Textual in Frameworks */ = {isa = PBXBuildFile; productRef = B747D07F2F9AEDEB0043003A /* Textual */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		B7595CBA3078B03500195C45 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = B75336402E161863005E9DE7 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B75336472E161863005E9DE7;
+			remoteInfo = DaNotes;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		B74204282E16675F00D31BC6 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		B75336482E161863005E9DE7 /* DaNotes.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DaNotes.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B7595CB63078B03500195C45 /* DaNotesTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DaNotesTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -35,6 +46,11 @@
 			path = DaNotes;
 			sourceTree = "<group>";
 		};
+		B7595CB73078B03500195C45 /* DaNotesTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = DaNotesTests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -46,6 +62,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B7595CB33078B03500195C45 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -53,6 +76,7 @@
 			isa = PBXGroup;
 			children = (
 				B753364A2E161863005E9DE7 /* DaNotes */,
+				B7595CB73078B03500195C45 /* DaNotesTests */,
 				B75336492E161863005E9DE7 /* Products */,
 				B74204282E16675F00D31BC6 /* AppIcon.icon */,
 			);
@@ -62,6 +86,7 @@
 			isa = PBXGroup;
 			children = (
 				B75336482E161863005E9DE7 /* DaNotes.app */,
+				B7595CB63078B03500195C45 /* DaNotesTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -92,6 +117,29 @@
 			productReference = B75336482E161863005E9DE7 /* DaNotes.app */;
 			productType = "com.apple.product-type.application";
 		};
+		B7595CB53078B03500195C45 /* DaNotesTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B7595CBC3078B03500195C45 /* Build configuration list for PBXNativeTarget "DaNotesTests" */;
+			buildPhases = (
+				B7595CB23078B03500195C45 /* Sources */,
+				B7595CB33078B03500195C45 /* Frameworks */,
+				B7595CB43078B03500195C45 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				B7595CBB3078B03500195C45 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				B7595CB73078B03500195C45 /* DaNotesTests */,
+			);
+			name = DaNotesTests;
+			packageProductDependencies = (
+			);
+			productName = DaNotesTests;
+			productReference = B7595CB63078B03500195C45 /* DaNotesTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -99,11 +147,15 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 2600;
+				LastSwiftUpdateCheck = 2700;
 				LastUpgradeCheck = 2620;
 				TargetAttributes = {
 					B75336472E161863005E9DE7 = {
 						CreatedOnToolsVersion = 26.0;
+					};
+					B7595CB53078B03500195C45 = {
+						CreatedOnToolsVersion = 27.0;
+						TestTargetID = B75336472E161863005E9DE7;
 					};
 				};
 			};
@@ -126,6 +178,7 @@
 			projectRoot = "";
 			targets = (
 				B75336472E161863005E9DE7 /* DaNotes */,
+				B7595CB53078B03500195C45 /* DaNotesTests */,
 			);
 		};
 /* End PBXProject section */
@@ -139,6 +192,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B7595CB43078B03500195C45 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -149,7 +209,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B7595CB23078B03500195C45 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		B7595CBB3078B03500195C45 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B75336472E161863005E9DE7 /* DaNotes */;
+			targetProxy = B7595CBA3078B03500195C45 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		B75336512E161865005E9DE7 /* Debug */ = {
@@ -395,6 +470,56 @@
 			};
 			name = Release;
 		};
+		B7595CBD3078B03500195C45 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = net.renorari.apps.DaNotes.DaNotesTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/DaNotes.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/DaNotes";
+				XROS_DEPLOYMENT_TARGET = 27.0;
+			};
+			name = Debug;
+		};
+		B7595CBE3078B03500195C45 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = net.renorari.apps.DaNotes.DaNotesTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/DaNotes.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/DaNotes";
+				XROS_DEPLOYMENT_TARGET = 27.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -412,6 +537,15 @@
 			buildConfigurations = (
 				B75336542E161865005E9DE7 /* Debug */,
 				B75336552E161865005E9DE7 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B7595CBC3078B03500195C45 /* Build configuration list for PBXNativeTarget "DaNotesTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B7595CBD3078B03500195C45 /* Debug */,
+				B7595CBE3078B03500195C45 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
