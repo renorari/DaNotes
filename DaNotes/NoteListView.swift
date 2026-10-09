@@ -214,6 +214,38 @@ struct NoteListView: View {
         return note.displayTitle.localizedStandardContains(query) || note.text.localizedStandardContains(query)
     }
 
+    /// A short excerpt of the body line where `query` first matches, with the
+    /// match highlighted — shown so a title-only row doesn't leave the user
+    /// guessing why a note matched a body search. `nil` when not searching,
+    /// searching by tag, or the match is already visible in the title.
+    private func bodyMatchSnippet(for note: Note, query: String) -> AttributedString? {
+        let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedQuery.isEmpty, !trimmedQuery.hasPrefix("#") else { return nil }
+        guard !note.displayTitle.localizedCaseInsensitiveContains(trimmedQuery) else { return nil }
+
+        let fullText = note.text as NSString
+        let matchRange = fullText.range(of: trimmedQuery, options: .caseInsensitive)
+        guard matchRange.location != NSNotFound else { return nil }
+
+        let line = fullText.substring(with: fullText.lineRange(for: matchRange))
+            .trimmingCharacters(in: .whitespacesAndNewlines) as NSString
+        let matchInLine = line.range(of: trimmedQuery, options: .caseInsensitive)
+        guard matchInLine.location != NSNotFound else { return nil }
+
+        let context = 40
+        let start = max(0, matchInLine.location - context)
+        let end = min(line.length, matchInLine.location + matchInLine.length + context)
+        var snippet = line.substring(with: NSRange(location: start, length: end - start))
+        if start > 0 { snippet = "…" + snippet }
+        if end < line.length { snippet += "…" }
+
+        var attributed = AttributedString(snippet)
+        if let highlightRange = attributed.range(of: trimmedQuery, options: [.caseInsensitive]) {
+            attributed[highlightRange].backgroundColor = .yellow.opacity(0.5)
+        }
+        return attributed
+    }
+
     private func sorted(_ notes: [Note]) -> [Note] {
         switch sortOrder {
         case .modified:
@@ -297,7 +329,12 @@ struct NoteListView: View {
             Text(note.modifiedAt, format: .dateTime)
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            if !note.tags.isEmpty {
+            if let snippet = bodyMatchSnippet(for: note, query: searchText) {
+                Text(snippet)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            } else if !note.tags.isEmpty {
                 Text(note.tags.map { "#\($0)" }.joined(separator: "  "))
                     .font(.caption2)
                     .foregroundStyle(.tint)
