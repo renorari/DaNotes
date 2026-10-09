@@ -45,6 +45,13 @@ struct HistoryView: View {
                 RevisionDetailView(note: note, revision: revision, onRestore: { dismiss() })
             }
         }
+#if os(macOS)
+        // Without an explicit size, macOS sometimes fails to negotiate a
+        // reasonable sheet size for a NavigationStack whose content switches
+        // between the tiny empty state and a full list, leaving the sheet
+        // collapsed and blank.
+        .frame(minWidth: 420, idealWidth: 480, minHeight: 420, idealHeight: 560)
+#endif
     }
 
     private func row(for revision: NoteRevision) -> some View {
@@ -100,6 +107,14 @@ struct HistoryView: View {
         }
         return (added, removed)
     }
+}
+
+#Preview {
+    let note = Note(text: "hello world")
+    _ = NoteRevision(note: note, parentIDs: [], text: "hello", deviceID: "d1", deviceName: "MacBook Pro", kind: .initial)
+    _ = NoteRevision(note: note, parentIDs: [], text: "hello world", deviceID: "d1", deviceName: "MacBook Pro", kind: .auto)
+    return HistoryView(note: note)
+        .modelContainer(for: Note.self, inMemory: true)
 }
 
 private struct RevisionDetailView: View {

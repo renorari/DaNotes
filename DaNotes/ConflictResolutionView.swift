@@ -79,6 +79,9 @@ struct ConflictResolutionView: View {
             }
             .interactiveDismissDisabled()
         }
+#if os(macOS)
+        .frame(minWidth: 480, idealWidth: 560, minHeight: 420, idealHeight: 600)
+#endif
     }
 
     @ViewBuilder
