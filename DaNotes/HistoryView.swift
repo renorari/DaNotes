@@ -52,8 +52,14 @@ struct HistoryView: View {
         // Without an explicit size, macOS sometimes fails to negotiate a
         // reasonable sheet size for a NavigationStack whose content switches
         // between the tiny empty state and a full list, leaving the sheet
-        // collapsed and blank.
-        .frame(minWidth: 420, idealWidth: 480, minHeight: 420, idealHeight: 560)
+        // collapsed and blank. Size the empty state modestly instead of
+        // reusing the list's taller frame, which left a large dead gap above
+        // the "no history" message.
+        .frame(
+            minWidth: 420, idealWidth: 480,
+            minHeight: revisions.isEmpty ? 220 : 420,
+            idealHeight: revisions.isEmpty ? 260 : 560
+        )
 #endif
     }
 
