@@ -56,13 +56,16 @@ enum ExportError: LocalizedError {
 
 // MARK: - URL scheme handler
 
-/// Serves the rendering template and bundled JavaScript from the app bundle,
-/// and image attachments from the attachments directory.
-final class MarkdownSchemeHandler: NSObject, WKURLSchemeHandler {
-    private let attachmentsURL: URL
+/// Looks up an image attachment's bytes by its file name.
+typealias AttachmentDataProvider = (String) -> Data?
 
-    init(attachmentsURL: URL) {
-        self.attachmentsURL = attachmentsURL
+/// Serves the rendering template and bundled JavaScript from the app bundle,
+/// and image attachments from `attachmentData`.
+final class MarkdownSchemeHandler: NSObject, WKURLSchemeHandler {
+    private let attachmentData: AttachmentDataProvider
+
+    init(attachmentData: @escaping AttachmentDataProvider) {
+        self.attachmentData = attachmentData
     }
 
     func webView(_ webView: WKWebView, start urlSchemeTask: WKURLSchemeTask) {
@@ -107,8 +110,7 @@ final class MarkdownSchemeHandler: NSObject, WKURLSchemeHandler {
         // path component is used to avoid directory traversal.
         let name = (path as NSString).lastPathComponent
         guard !name.isEmpty else { return nil }
-        let fileURL = attachmentsURL.appendingPathComponent(name)
-        guard let data = try? Data(contentsOf: fileURL) else { return nil }
+        guard let data = attachmentData(name) else { return nil }
         return (data, Self.mimeType(for: name))
     }
 
@@ -150,10 +152,10 @@ final class MarkdownSchemeHandler: NSObject, WKURLSchemeHandler {
 // MARK: - Configuration factory
 
 enum MarkdownWebConfiguration {
-    static func make(attachmentsURL: URL) -> WKWebViewConfiguration {
+    static func make(attachmentData: @escaping AttachmentDataProvider) -> WKWebViewConfiguration {
         let configuration = WKWebViewConfiguration()
         configuration.setURLSchemeHandler(
-            MarkdownSchemeHandler(attachmentsURL: attachmentsURL),
+            MarkdownSchemeHandler(attachmentData: attachmentData),
             forURLScheme: MarkdownWeb.scheme
         )
         return configuration
@@ -174,21 +176,33 @@ final class MarkdownWebViewController {
     /// the preview.
     var onImageTapped: ((String) -> Void)?
 
+    /// Invoked with the tag's text (without `#`) when the user taps a
+    /// hashtag chip in the preview.
+    var onHashtagTapped: ((String) -> Void)?
+
     func refreshAttachments() {
         coordinator?.refreshAttachments()
+    }
+
+    /// Scrolls the preview to the `index`-th top-level heading.
+    func scrollToHeading(at index: Int) {
+        coordinator?.scrollToHeading(at: index)
     }
 }
 
 struct MarkdownWebView {
     let markdown: String
-    let attachmentsURL: URL
+    let attachmentData: AttachmentDataProvider
     var controller: MarkdownWebViewController? = nil
 
     func makeCoordinator() -> Coordinator {
-        let coordinator = Coordinator(attachmentsURL: attachmentsURL)
+        let coordinator = Coordinator(attachmentData: attachmentData)
         controller?.coordinator = coordinator
         coordinator.onImageTapped = { [weak controller] fileName in
             controller?.onImageTapped?(fileName)
+        }
+        coordinator.onHashtagTapped = { [weak controller] tag in
+            controller?.onHashtagTapped?(tag)
         }
         return coordinator
     }
@@ -203,14 +217,19 @@ struct MarkdownWebView {
         /// Dynamic Type so the preview matches the editor's body font.
         private var rootFontSizePx: CGFloat = 16
         private var appliedRootFontSizePx: CGFloat?
+        private var isRendering = false
+        /// A heading scroll requested before the page could honour it.
+        private var pendingHeadingIndex: Int?
         var onImageTapped: ((String) -> Void)?
+        var onHashtagTapped: ((String) -> Void)?
 
-        init(attachmentsURL: URL) {
-            let configuration = MarkdownWebConfiguration.make(attachmentsURL: attachmentsURL)
+        init(attachmentData: @escaping AttachmentDataProvider) {
+            let configuration = MarkdownWebConfiguration.make(attachmentData: attachmentData)
             webView = WKWebView(frame: .zero, configuration: configuration)
             super.init()
             webView.navigationDelegate = self
             configuration.userContentController.add(self, name: "imageTapped")
+            configuration.userContentController.add(self, name: "hashtagTapped")
             // Let the SwiftUI background show through so the rendered content
             // blends with the window instead of using WebKit's own (slightly
             // different) system background, which is visible in dark mode.
@@ -239,7 +258,7 @@ struct MarkdownWebView {
             applyRootFontSize()
         }
 
-        /// Forces the next render to refetch every attachment image from disk.
+        /// Forces the next render to refetch every attachment image.
         /// Needed after an existing attachment file is overwritten in place:
         /// the page would otherwise keep showing the bytes it already decoded
         /// for that (unchanged) URL, so a full reload is required to drop them.
@@ -248,18 +267,40 @@ struct MarkdownWebView {
             webView.reload()
         }
 
+        func scrollToHeading(at index: Int) {
+            pendingHeadingIndex = index
+            guard isLoaded, !isRendering else { return }
+            applyPendingHeadingScroll()
+        }
+
+        private func applyPendingHeadingScroll() {
+            guard let index = pendingHeadingIndex else { return }
+            pendingHeadingIndex = nil
+            webView.evaluateJavaScript("window.__daNotesScrollToHeading(\(index));", completionHandler: nil)
+        }
+
         private func renderPending() {
-            guard let markdown = pendingMarkdown, markdown != lastRendered else { return }
+            guard let markdown = pendingMarkdown, markdown != lastRendered else {
+                applyPendingHeadingScroll()
+                return
+            }
             let previous = lastRendered
             lastRendered = markdown
             // Follow the user down the page: if they just typed more text at
             // the end of the note, scroll the preview to the bottom once the
             // re-render lands.
             let shouldScrollToBottom = Self.appendedAtEnd(from: previous, to: markdown)
-            let literal = MarkdownWeb.jsStringLiteral(markdown)
-            webView.evaluateJavaScript("window.__daNotesRender(\(literal));") { [weak self] _, _ in
-                guard shouldScrollToBottom else { return }
-                self?.webView.evaluateJavaScript("window.scrollTo(0, document.body.scrollHeight);", completionHandler: nil)
+            isRendering = true
+            // `__daNotesRender` is async, so wait on its promise; the default
+            // completion would fire before MathJax finishes laying out.
+            webView.callAsyncJavaScript("await window.__daNotesRender(md);", arguments: ["md": markdown], in: nil, in: .page) { [weak self] _ in
+                guard let self else { return }
+                self.isRendering = false
+                if self.pendingHeadingIndex != nil {
+                    self.applyPendingHeadingScroll()
+                } else if shouldScrollToBottom {
+                    self.webView.evaluateJavaScript("window.scrollTo(0, document.body.scrollHeight);", completionHandler: nil)
+                }
             }
         }
 
@@ -287,8 +328,14 @@ struct MarkdownWebView {
         }
 
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-            guard message.name == "imageTapped", let fileName = message.body as? String else { return }
-            onImageTapped?(fileName)
+            switch message.name {
+            case "imageTapped":
+                if let fileName = message.body as? String { onImageTapped?(fileName) }
+            case "hashtagTapped":
+                if let tag = message.body as? String { onHashtagTapped?(tag) }
+            default:
+                break
+            }
         }
     }
 }
@@ -347,9 +394,9 @@ final class MarkdownPDFExporter: NSObject {
     private var pdfOutputURL: URL?
 #endif
 
-    init(markdown: String, attachmentsURL: URL) {
+    init(markdown: String, attachmentData: @escaping AttachmentDataProvider) {
         self.markdown = markdown
-        let configuration = MarkdownWebConfiguration.make(attachmentsURL: attachmentsURL)
+        let configuration = MarkdownWebConfiguration.make(attachmentData: attachmentData)
         webView = WKWebView(frame: Self.a4, configuration: configuration)
         super.init()
         configuration.userContentController.add(self, name: "rendered")
@@ -555,9 +602,9 @@ final class MarkdownImageExporter: NSObject {
     private var hostWindow: NSWindow?
 #endif
 
-    init(markdown: String, attachmentsURL: URL) {
+    init(markdown: String, attachmentData: @escaping AttachmentDataProvider) {
         self.markdown = markdown
-        let configuration = MarkdownWebConfiguration.make(attachmentsURL: attachmentsURL)
+        let configuration = MarkdownWebConfiguration.make(attachmentData: attachmentData)
         let initialFrame = CGRect(x: 0, y: 0, width: Self.contentWidth, height: 1)
         webView = WKWebView(frame: initialFrame, configuration: configuration)
         super.init()

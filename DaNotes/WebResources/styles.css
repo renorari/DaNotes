@@ -84,6 +84,11 @@ hr {
   border-top: 0.1rem solid -apple-system-separator;
 }
 
+.hashtag {
+  color: -apple-system-blue;
+  cursor: pointer;
+}
+
 body.pdf {
   background: #ffffff;
   padding: 0;

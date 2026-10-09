@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import SwiftData
 import UniformTypeIdentifiers
 #if os(iOS)
 import PhotosUI
@@ -15,17 +16,24 @@ import AppKit
 #endif
 
 struct ContentView: View {
-    @AppStorage("text") private var text: String = ""
+    @Bindable var note: Note
+    var outlineJump: OutlineJump? = nil
+    /// Invoked with a tag's text (without `#`) when the user taps a hashtag
+    /// chip in the preview, so the sidebar can filter by it.
+    var onHashtagTapped: ((String) -> Void)? = nil
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.scenePhase) private var scenePhase
     @State private var showEditor: Bool = true
     @State private var showView: Bool = true
-    @State private var showClearConfirmation: Bool = false
     @State private var showImagePicker: Bool = false
     @State private var showHandwriting: Bool = false
+    @State private var showHistory: Bool = false
+    @State private var pendingConflict: RevisionStore.PendingConflict?
+    @State private var commitTask: Task<Void, Never>?
 #if os(iOS)
     @State private var showTablePicker: Bool = false
     @State private var markupTarget: MarkupTarget?
 #endif
-    @AppStorage("SuppressClearConfirmation") private var suppressClearConfirmation: Bool = false
 #if os(iOS)
     @State private var shareItem: ShareItem?
     @State private var selectedPhotoItem: PhotosPickerItem?
@@ -34,12 +42,24 @@ struct ContentView: View {
     @State private var imageImportErrorMessage: String?
     @State private var editorController = PlainTextEditorController()
     @State private var markdownViewController = MarkdownWebViewController()
-    
+
+    private var text: String {
+        get { note.text }
+        nonmutating set {
+            note.text = newValue
+            note.modifiedAt = Date()
+        }
+    }
+
+    private var attachmentStore: ImageAttachmentStore {
+        ImageAttachmentStore(context: modelContext)
+    }
+
     var body: some View {
         NavigationStack {
             HStack {
                 if showEditor {
-                    PlainTextEditor(text: $text, controller: editorController)
+                    PlainTextEditor(text: Binding(get: { text }, set: { text = $0 }), controller: editorController)
                 }
                 
                 if showEditor && showView {
@@ -47,7 +67,9 @@ struct ContentView: View {
                 }
                 
                 if showView {
-                    MarkdownWebView(markdown: text, attachmentsURL: ImageAttachmentStore.shared.baseURL, controller: markdownViewController)
+                    MarkdownWebView(markdown: text, attachmentData: { [modelContext] name in
+                        ImageAttachmentStore(context: modelContext).data(named: name)
+                    }, controller: markdownViewController)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
@@ -56,6 +78,18 @@ struct ContentView: View {
             #else
             .padding(.horizontal)
             #endif
+            // Attachments synced from another device can land after the text
+            // that references them; refetch so they appear once they arrive.
+            .onChange(of: note.attachments?.count) {
+                markdownViewController.refreshAttachments()
+            }
+            // `task(id:)` rather than `onChange` so a jump requested while this
+            // view was being created (compact layouts) still applies.
+            .task(id: outlineJump) {
+                guard let item = outlineJump?.item else { return }
+                editorController.reveal(location: item.location)
+                markdownViewController.scrollToHeading(at: item.index)
+            }
             .onDrop(of: [.image], isTargeted: nil) { providers in
                 handleImageDrop(providers)
             }
@@ -86,6 +120,9 @@ struct ContentView: View {
                         showHandwriting = true
                     }
 #endif
+                    Button(.noteHistory, systemImage: "clock.arrow.circlepath") {
+                        showHistory = true
+                    }
                 }
                 ToolbarSpacer()
                 ToolbarItemGroup {
@@ -95,24 +132,6 @@ struct ContentView: View {
                     Toggle(.showView, systemImage: "text.page", isOn: $showView)
                         .keyboardShortcut("r", modifiers: .command)
                         .disabled(!showEditor)
-                }
-                ToolbarSpacer()
-                ToolbarItem() {
-                    Button(.clearButton, systemImage: "trash") {
-                        if suppressClearConfirmation || text.isEmpty {
-                            clearAllContent()
-                        } else {
-                            showClearConfirmation = true
-                        }
-                    }
-                    .keyboardShortcut(.delete, modifiers: .command)
-                    .confirmationDialog(.clearConfirm, isPresented: $showClearConfirmation) {
-                        Button(.clearButton, role: .destructive) {
-                            clearAllContent()
-                        }
-                    }
-                    .dialogIcon(Image(systemName: "trash.circle.fill"))
-                    .dialogSuppressionToggle(isSuppressed: $suppressClearConfirmation)
                 }
             }
 #if os(iOS)
@@ -199,13 +218,58 @@ struct ContentView: View {
                 editorController.onImagePaste = { data, fileExtension in
                     insertPastedImage(data, fileExtension: fileExtension)
                 }
+                markdownViewController.onHashtagTapped = { tag in
+                    onHashtagTapped?(tag)
+                }
             }
+            .sheet(isPresented: $showHistory) {
+                HistoryView(note: note)
+            }
+            .sheet(item: $pendingConflict) { conflict in
+                ConflictResolutionView(note: note, conflict: conflict)
+            }
+            // Revisions set up the "never silently lose edits" safety net:
+            // periodic auto-commits while typing, a flush when leaving the
+            // note or backgrounding the app, and a merge check whenever
+            // sync brings in another device's revisions.
+            .onAppear {
+                reconcileIfNeeded()
+            }
+            .onDisappear {
+                commitTask?.cancel()
+                RevisionStore.commit(note: note, context: modelContext)
+            }
+            .onChange(of: note.text) {
+                commitTask?.cancel()
+                commitTask = Task {
+                    try? await Task.sleep(for: .seconds(30))
+                    guard !Task.isCancelled else { return }
+                    RevisionStore.commit(note: note, context: modelContext)
+                }
+            }
+            .onChange(of: note.revisions?.count) {
+                reconcileIfNeeded()
+            }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .background {
+                    commitTask?.cancel()
+                    RevisionStore.commit(note: note, context: modelContext)
+                }
+            }
+        }
+    }
+
+    @MainActor
+    private func reconcileIfNeeded() {
+        if let conflict = RevisionStore.reconcile(note: note, context: modelContext) {
+            pendingConflict = conflict
         }
     }
 }
 
 #Preview {
-    ContentView()
+    ContentView(note: Note(text: "# DaNotes"))
+        .modelContainer(for: Note.self, inMemory: true)
 }
 
 private extension ContentView {
@@ -240,7 +304,9 @@ private extension ContentView {
 
         let exporter = MarkdownPDFExporter(
             markdown: text,
-            attachmentsURL: ImageAttachmentStore.shared.baseURL
+            attachmentData: { [modelContext] name in
+                ImageAttachmentStore(context: modelContext).data(named: name)
+            }
         )
         exporter.export { result in
             switch result {
@@ -271,7 +337,9 @@ private extension ContentView {
 
         let exporter = MarkdownImageExporter(
             markdown: text,
-            attachmentsURL: ImageAttachmentStore.shared.baseURL
+            attachmentData: { [modelContext] name in
+                ImageAttachmentStore(context: modelContext).data(named: name)
+            }
         )
         exporter.export { result in
             switch result {
@@ -354,12 +422,8 @@ private extension ContentView {
     /// Stores raw image data (e.g. pasted from the system clipboard) as an
     /// attachment and inserts the corresponding Markdown at the caret.
     func insertPastedImage(_ data: Data, fileExtension: String) {
-        do {
-            let storedURL = try ImageAttachmentStore.shared.storeImageData(data, fileExtension: fileExtension)
-            insertImageMarkdown(relativePath: storedURL.lastPathComponent)
-        } catch {
-            handleImageImportError(error)
-        }
+        let fileName = attachmentStore.store(data, fileExtension: fileExtension, in: note)
+        insertImageMarkdown(relativePath: fileName)
     }
 
     /// Handles images dragged into the window from Finder, Photos, Safari,
@@ -398,8 +462,8 @@ private extension ContentView {
         }
 
         do {
-            let storedURL = try ImageAttachmentStore.shared.storeCopiedImage(from: url)
-            insertImageMarkdown(relativePath: storedURL.lastPathComponent)
+            let fileName = try attachmentStore.storeCopiedImage(from: url, in: note)
+            insertImageMarkdown(relativePath: fileName)
         } catch {
             handleImageImportError(error)
         }
@@ -418,18 +482,17 @@ private extension ContentView {
             }
 
             let ext = photoItem.supportedContentTypes.first?.preferredFilenameExtension ?? "jpg"
-            let storedURL = try ImageAttachmentStore.shared.storeImageData(data, fileExtension: ext)
-            insertImageMarkdown(relativePath: storedURL.lastPathComponent)
+            let fileName = attachmentStore.store(data, fileExtension: ext, in: note)
+            insertImageMarkdown(relativePath: fileName)
         } catch {
             handleImageImportError(error)
         }
     }
 
-    /// Loads the tapped attachment from disk and presents it for markup.
+    /// Loads the tapped attachment and presents it for markup.
     @MainActor
     func presentMarkup(for fileName: String) {
-        let fileURL = ImageAttachmentStore.shared.baseURL.appendingPathComponent(fileName)
-        guard let data = try? Data(contentsOf: fileURL), let image = UIImage(data: data) else { return }
+        guard let data = attachmentStore.data(named: fileName), let image = UIImage(data: data) else { return }
         markupTarget = MarkupTarget(fileName: fileName, image: image)
     }
 
@@ -438,22 +501,20 @@ private extension ContentView {
     /// bytes it already decoded for that unchanged URL).
     @MainActor
     func saveMarkup(_ data: Data, fileName: String) {
-        let fileURL = ImageAttachmentStore.shared.baseURL.appendingPathComponent(fileName)
-        do {
-            try data.write(to: fileURL, options: .atomic)
-            markdownViewController.refreshAttachments()
-        } catch {
-            handleImageImportError(error)
-        }
+        guard let attachment = attachmentStore.attachment(named: fileName) else { return }
+        attachment.data = data
+        note.modifiedAt = Date()
+        markdownViewController.refreshAttachments()
     }
 #endif
 
-    func clearAllContent() {
-        text = ""
-        ImageAttachmentStore.shared.removeAllAttachments()
-    }
-
     func defaultExportFileName() -> String {
+        if let title = note.headingTitle {
+            let invalid = CharacterSet(charactersIn: "/\\:?%*|\"<>").union(.newlines).union(.controlCharacters)
+            let sanitized = title.components(separatedBy: invalid).joined(separator: "_")
+                .trimmingCharacters(in: .whitespaces)
+            if !sanitized.isEmpty { return String(sanitized.prefix(100)) }
+        }
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyyMMdd_HHmmss"
         return "DaNotes_\(formatter.string(from: Date()))"
@@ -473,62 +534,6 @@ private extension ContentView {
         shareItem = nil
     }
 #endif
-}
-
-private struct ImageAttachmentStore {
-    static let shared = ImageAttachmentStore()
-
-    let baseURL: URL
-
-    private init() {
-        let fileManager = FileManager.default
-        let supportDirectory = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-            ?? fileManager.temporaryDirectory
-        let attachmentsDirectory = supportDirectory
-            .appendingPathComponent("DaNotes", isDirectory: true)
-            .appendingPathComponent("Attachments", isDirectory: true)
-
-        try? fileManager.createDirectory(at: attachmentsDirectory, withIntermediateDirectories: true)
-        self.baseURL = attachmentsDirectory
-    }
-
-    func storeCopiedImage(from sourceURL: URL) throws -> URL {
-        let fileManager = FileManager.default
-        let extensionValue = sourceURL.pathExtension
-        let fileName = extensionValue.isEmpty
-            ? UUID().uuidString
-            : "\(UUID().uuidString).\(extensionValue.lowercased())"
-        let destinationURL = baseURL.appendingPathComponent(fileName)
-
-        try fileManager.copyItem(at: sourceURL, to: destinationURL)
-        return destinationURL
-    }
-
-    func storeImageData(_ data: Data, fileExtension: String) throws -> URL {
-        let normalizedExtension = fileExtension.lowercased()
-        let fileName = normalizedExtension.isEmpty
-            ? UUID().uuidString
-            : "\(UUID().uuidString).\(normalizedExtension)"
-        let destinationURL = baseURL.appendingPathComponent(fileName)
-
-        try data.write(to: destinationURL, options: .atomic)
-        return destinationURL
-    }
-
-    func removeAllAttachments() {
-        let fileManager = FileManager.default
-        guard let urls = try? fileManager.contentsOfDirectory(
-            at: baseURL,
-            includingPropertiesForKeys: nil,
-            options: [.skipsHiddenFiles]
-        ) else {
-            return
-        }
-
-        for url in urls {
-            try? fileManager.removeItem(at: url)
-        }
-    }
 }
 
 #if os(iOS)

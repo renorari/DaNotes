@@ -149,6 +149,20 @@ final class PlainTextEditorController {
     /// and insert the corresponding Markdown at the caret.
     var onImagePaste: ((Data, String) -> Void)?
 
+    /// Moves the caret to the UTF-16 offset `location` and scrolls its line
+    /// to the top of the editor.
+    func reveal(location: Int) {
+        guard let textView else { return }
+        let length = (textView.string as NSString).length
+        let range = NSRange(location: min(max(location, 0), length), length: 0)
+        textView.setSelectedRange(range)
+        // Jumping to the end first makes `scrollRangeToVisible` bring the line
+        // in from below, which leaves it at the top of the viewport.
+        textView.scrollToEndOfDocument(nil)
+        textView.scrollRangeToVisible(range)
+        textView.window?.makeFirstResponder(textView)
+    }
+
     /// Inserts `block` at the caret as its own paragraph, adding surrounding
     /// blank lines only where needed. Returns `false` when no text view is
     /// attached (e.g. the editor pane is hidden), so callers can fall back.
@@ -375,6 +389,23 @@ final class PlainTextEditorController {
     /// a suitable file extension, so the host can store it as an attachment
     /// and insert the corresponding Markdown at the caret.
     var onImagePaste: ((Data, String) -> Void)?
+
+    /// Moves the caret to the UTF-16 offset `location` and scrolls its line
+    /// to the top of the editor (as far as the content allows).
+    func reveal(location: Int) {
+        guard let textView else { return }
+        let length = (textView.text ?? "").utf16.count
+        let offset = min(max(location, 0), length)
+        textView.selectedRange = NSRange(location: offset, length: 0)
+        guard let position = textView.position(from: textView.beginningOfDocument, offset: offset) else { return }
+        textView.layoutIfNeeded()
+        let caret = textView.caretRect(for: position)
+        let insets = textView.adjustedContentInset
+        let minY = -insets.top
+        let maxY = max(textView.contentSize.height + insets.bottom - textView.bounds.height, minY)
+        let y = min(max(caret.minY - textView.textContainerInset.top, minY), maxY)
+        textView.setContentOffset(CGPoint(x: textView.contentOffset.x, y: y), animated: true)
+    }
 
     // MARK: - Primitives
 
