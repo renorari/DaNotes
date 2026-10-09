@@ -72,6 +72,7 @@ enum RevisionStore {
             deviceName: DeviceIdentity.name,
             kind: effectiveKind
         ))
+        SpotlightIndexer.index(note)
     }
 
     /// Folds divergent heads back into one. When the merge is clean, applies
@@ -128,6 +129,7 @@ enum RevisionStore {
             deviceName: DeviceIdentity.name,
             kind: .restore
         ))
+        SpotlightIndexer.index(note)
     }
 
     private static func applyMerge(text: String, parents: [NoteRevision], note: Note, context: ModelContext) {
@@ -141,5 +143,6 @@ enum RevisionStore {
             deviceName: DeviceIdentity.name,
             kind: .merge
         ))
+        SpotlightIndexer.index(note)
     }
 }

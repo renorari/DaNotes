@@ -100,6 +100,13 @@ struct NoteListView: View {
                 selectedTag = nil
             }
         }
+        // Set by `OpenNoteIntent` when the user taps a note in Spotlight.
+        .onChange(of: NavigationCoordinator.shared.pendingNoteID) { _, newValue in
+            guard let newValue, notes.contains(where: { $0.id == newValue }) else { return }
+            selectedNoteID = newValue
+            sidebarMode = .notes
+            NavigationCoordinator.shared.pendingNoteID = nil
+        }
         .confirmationDialog(
             Text(deleteConfirmationTitle),
             isPresented: Binding(get: { noteToDelete != nil }, set: { if !$0 { noteToDelete = nil } }),
@@ -111,9 +118,12 @@ struct NoteListView: View {
         }
         .onAppear {
             LegacyNoteMigrator.migrateIfNeeded(context: modelContext)
-            guard selectedNoteID == nil else { return }
             // Fetch directly: `notes` hasn't picked up a just-migrated note yet.
             let allNotes = (try? modelContext.fetch(FetchDescriptor<Note>())) ?? []
+            // The Spotlight index is local to this device, so re-index
+            // everything at launch to pick up changes synced in from others.
+            SpotlightIndexer.indexAll(allNotes)
+            guard selectedNoteID == nil else { return }
             let selected = resumeNote(from: allNotes)
             selectedNoteID = selected.id
             // A blank note left over from a previous session (other than the
@@ -409,6 +419,7 @@ struct NoteListView: View {
         if selectedNoteID == note.id {
             selectedNoteID = notes.first { $0.id != note.id }?.id
         }
+        SpotlightIndexer.remove(note)
         modelContext.delete(note)
     }
 

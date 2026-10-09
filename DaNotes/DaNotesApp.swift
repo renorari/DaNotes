@@ -10,18 +10,7 @@ import SwiftData
 
 @main
 struct DaNotesApp: App {
-    // Synced through the CloudKit container in the app's entitlements; without
-    // an iCloud account the store simply stays local.
-    private let modelContainer: ModelContainer = {
-        do {
-            return try ModelContainer(
-                for: Note.self, NoteAttachment.self,
-                configurations: ModelConfiguration(cloudKitDatabase: .automatic)
-            )
-        } catch {
-            fatalError("Failed to create the model container: \(error)")
-        }
-    }()
+    private let modelContainer = AppModelContainer.shared
 
     var body: some Scene {
         // All notes live in one sidebar, so a single window is enough. `Window`
