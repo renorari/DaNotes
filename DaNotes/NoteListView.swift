@@ -60,21 +60,9 @@ struct NoteListView: View {
                             }
                             .keyboardShortcut("n", modifiers: .command)
                         }
-                        if sidebarMode == .notes {
-                            ToolbarItem {
-                                viewOptionsMenu
-                            }
-                        }
                         ToolbarSpacer()
-                        ToolbarItemGroup {
-                            Picker(selection: $sidebarMode) {
-                                Label(.sidebarNotes, systemImage: "list.bullet").tag(SidebarMode.notes)
-                                Label(.sidebarOutline, systemImage: "list.bullet.indent").tag(SidebarMode.outline)
-                            } label: {
-                                EmptyView()
-                            }
-                            .pickerStyle(.segmented)
-                            .labelsHidden()
+                        ToolbarItem {
+                            viewOptionsMenu
                         }
                     }
                     .searchable(text: $searchText, prompt: Text(.searchNotesPrompt))
@@ -279,42 +267,60 @@ struct NoteListView: View {
         }
     }
 
-    // Sort and tag filtering are secondary, infrequently-changed settings, so
-    // they're tucked under a single "…" menu (as in Notes/Reminders) rather
-    // than each getting their own always-visible toolbar button.
+    // The notes/outline switch, sort, and tag filtering are all secondary
+    // controls relative to the note list itself, so they share a single "…"
+    // menu (as in Notes/Reminders) rather than each getting its own
+    // always-visible toolbar button.
     private var viewOptionsMenu: some View {
         Menu {
-            Menu {
-                sortOptionButton(.modified, title: .sortByModified)
-                sortOptionButton(.lastOpened, title: .sortByLastOpened)
-                sortOptionButton(.created, title: .sortByCreated)
-                sortOptionButton(.title, title: .sortByTitle)
-            } label: {
-                Label(.sortMenuTitle, systemImage: "arrow.up.arrow.down")
-            }
-            Menu {
-                Button(.allTagsFilterOption) {
-                    selectedTag = nil
+            sidebarModeButton(.notes, title: .sidebarNotes)
+            sidebarModeButton(.outline, title: .sidebarOutline)
+            if sidebarMode == .notes {
+                Divider()
+                Menu {
+                    sortOptionButton(.modified, title: .sortByModified)
+                    sortOptionButton(.lastOpened, title: .sortByLastOpened)
+                    sortOptionButton(.created, title: .sortByCreated)
+                    sortOptionButton(.title, title: .sortByTitle)
+                } label: {
+                    Label(.sortMenuTitle, systemImage: "arrow.up.arrow.down")
                 }
-                if !allTags.isEmpty {
-                    Divider()
-                    ForEach(allTags, id: \.self) { tag in
-                        Button {
-                            selectedTag = tag
-                        } label: {
-                            if selectedTag?.caseInsensitiveCompare(tag) == .orderedSame {
-                                Label(tag, systemImage: "checkmark")
-                            } else {
-                                Text(tag)
+                Menu {
+                    Button(.allTagsFilterOption) {
+                        selectedTag = nil
+                    }
+                    if !allTags.isEmpty {
+                        Divider()
+                        ForEach(allTags, id: \.self) { tag in
+                            Button {
+                                selectedTag = tag
+                            } label: {
+                                if selectedTag?.caseInsensitiveCompare(tag) == .orderedSame {
+                                    Label(tag, systemImage: "checkmark")
+                                } else {
+                                    Text(tag)
+                                }
                             }
                         }
                     }
+                } label: {
+                    Label(.tagFilterMenuTitle, systemImage: selectedTag == nil ? "tag" : "tag.fill")
                 }
-            } label: {
-                Label(.tagFilterMenuTitle, systemImage: selectedTag == nil ? "tag" : "tag.fill")
             }
         } label: {
             Label(.viewOptions, systemImage: selectedTag == nil ? "ellipsis.circle" : "ellipsis.circle.fill")
+        }
+    }
+
+    private func sidebarModeButton(_ mode: SidebarMode, title: LocalizedStringResource) -> some View {
+        Button {
+            sidebarMode = mode
+        } label: {
+            if sidebarMode == mode {
+                Label(title, systemImage: "checkmark")
+            } else {
+                Text(title)
+            }
         }
     }
 
