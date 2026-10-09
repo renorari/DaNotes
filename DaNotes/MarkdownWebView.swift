@@ -481,10 +481,14 @@ final class MarkdownPDFExporter: NSObject {
 #else
         let renderer = UIPrintPageRenderer()
         renderer.addPrintFormatter(webView.viewPrintFormatter(), startingAtPageAt: 0)
-        // Full-page paper/printable area; page margins come from the `@page`
-        // rule so they repeat on every page.
+        // Unlike `NSPrintOperation` on macOS, `UIPrintPageRenderer` paginates
+        // the formatter's view content directly rather than running WebKit's
+        // CSS paged-media engine, so the stylesheet's `@page` margin rule has
+        // no effect here — it has to be reproduced manually to match.
+        let marginH = 16 * 72.0 / 25.4
+        let marginV = 18 * 72.0 / 25.4
         renderer.setValue(Self.a4, forKey: "paperRect")
-        renderer.setValue(Self.a4, forKey: "printableRect")
+        renderer.setValue(Self.a4.insetBy(dx: marginH, dy: marginV), forKey: "printableRect")
 
         let data = NSMutableData()
         UIGraphicsBeginPDFContextToData(data, Self.a4, nil)
