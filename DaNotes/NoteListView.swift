@@ -46,7 +46,13 @@ struct NoteListView: View {
             // column that declares them.
             NavigationStack {
                 sidebarList
+                    // On macOS this becomes the window title; on iOS/iPadOS
+                    // it would instead compete with the toolbar buttons for
+                    // space in an already-busy bar, truncating to "DaNo…", so
+                    // it's macOS-only.
+                    #if os(macOS)
                     .navigationTitle("DaNotes")
+                    #endif
                     .toolbar {
                         ToolbarItem {
                             Button(.newNote, systemImage: "square.and.pencil") {
