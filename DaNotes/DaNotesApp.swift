@@ -11,6 +11,8 @@ import SwiftData
 @main
 struct DaNotesApp: App {
     private let modelContainer = AppModelContainer.shared
+    // Created up front so it catches the sync events fired at launch.
+    private let syncMonitor = SyncMonitor.shared
 
     var body: some Scene {
         // All notes live in one sidebar, so a single window is enough. `Window`

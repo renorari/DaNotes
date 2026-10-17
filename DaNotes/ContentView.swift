@@ -123,9 +123,14 @@ struct ContentView: View {
                 }
                 ToolbarSpacer()
                 ToolbarItemGroup {
-                    Button(.noteHistory, systemImage: "clock.arrow.circlepath") {
+                    Button(.noteHistory, systemImage: SyncMonitor.shared.isSyncing
+                           ? "clock.arrow.trianglehead.2.counterclockwise.rotate.90"
+                           : "clock.arrow.circlepath") {
                         showHistory = true
                     }
+#if os(macOS)
+                    .symbolEffect(.rotate.byLayer, options: .repeat(.continuous), isActive: SyncMonitor.shared.isSyncing)
+#endif
                 }
                 ToolbarSpacer()
                 ToolbarItemGroup {
